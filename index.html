@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OVONORTE — Sistema de Gestão Avícola</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --verde: #1a7a4a;
+  --verde-claro: #22a35f;
+  --verde-escuro: #0d5232;
+  --verde-bg: #e8f5ee;
+  --amarelo: #f0b429;
+  --amarelo-claro: #fcefc7;
+  --vermelho: #c0392b;
+  --vermelho-claro: #fde8e6;
+  --cinza-1: #f8f9fa;
+  --cinza-2: #e9ecef;
+  --cinza-3: #dee2e6;
+  --cinza-4: #6c757d;
+  --cinza-5: #495057;
+  --cinza-6: #343a40;
+  --branco: #ffffff;
+  --sombra: 0 2px 8px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --sidebar: 280px;
+}
+
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--cinza-1);
+  font-size: 14px;
+  color: var(--cinza-6);
+}
+
+/* Login */
+#login-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--verde-escuro), var(--verde));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+.login-card {
+  background: white;
+  border-radius: 24px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo .icon {
+  width: 70px;
+  height: 70px;
+  background: var(--verde-bg);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 32px;
+}
+
+.login-logo h1 {
+  font-size: 24px;
+  color: var(--verde-escuro);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cinza-4);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--cinza-3);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.form-group input:focus, .form-group select:focus {
+  outline: none;
+  border-color: var(--verde);
+}
+
+.btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--verde);
+  color: white;
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background: var(--verde-claro);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--cinza-2);
+  color: var(--cinza-5);
+}
+
+.btn-danger {
+  background: var(--vermelho-claro);
+  color: var(--vermelho);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.error-msg {
+  background: var(--vermelho-claro);
+  color: var(--vermelho);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: none;
+  font-size: 13px;
+}
+
+/* App */
+#app-screen {
+  display: none;
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar);
+  background: var(--verde-escuro);
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-logo .icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.sidebar-logo h2 {
+  color: white;
+  font-size: 18px;
+}
+
+.sidebar-logo small {
+  color: rgba(255,255,255,0.5);
+  font-size: 10px;
+}
+
+.sidebar-nav {
+  padding: 16px 12px;
+}
+
+.nav-section {
+  margin-bottom: 16px;
+}
+
+.nav-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.nav-item:hover, .nav-item.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+}
+
+.nav-item.active i {
+  color: var(--amarelo);
+}
+
+.sidebar-user {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  background: var(--verde-escuro);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: var(--amarelo);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: var(--verde-escuro);
+}
+
+.user-name {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-role {
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-logout:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.main-content {
+  margin-left: var(--sidebar);
+  min-height: 100vh;
+}
+
+.topbar {
+  background: white;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--cinza-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar h1 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.topbar-meta {
+  font-size: 12px;
+  color: var(--cinza-4);
+  margin-top: 4px;
+}
+
+.content-area {
+  padding: 24px;
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--sombra);
+  margin-bottom: 24px;
+}
+
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--cinza-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* KPIs */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--sombra);
+  border-left: 4px solid var(--verde);
+  position: relative;
+}
+
+.kpi-card.amarelo { border-left-color: var(--amarelo); }
+.kpi-card.vermelho { border-left-color: var(--vermelho); }
+.kpi-card.azul { border-left-color: #3498db; }
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cinza-4);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: var(--cinza-4);
+  margin-top: 4px;
+}
+
+.kpi-icon {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  font-size: 32px;
+  opacity: 0.1;
+}
+
+/* Tabelas */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cinza-4);
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--cinza-2);
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--cinza-2);
+}
+
+.data-table tr:hover td {
+  background: var(--cinza-1);
+}
+
+/* Grids */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-verde {
+  background: var(--verde-bg);
+  color: var(--verde-escuro);
+}
+
+.badge-amarelo {
+  background: var(--amarelo-claro);
+  color: #8a6200;
+}
+
+.badge-vermelho {
+  background: var(--vermelho-claro);
+  color: var(--vermelho);
+}
+
+/* Alertas */
+.alert {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-info {
+  background: var(--verde-bg);
+  color: var(--verde-escuro);
+}
+
+.alert-warning {
+  background: var(--amarelo-claro);
+  color: #8a6200;
+}
+
+/* Tabs para relatórios */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--cinza-2);
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  padding: 8px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cinza-4);
+  border-radius: 20px;
+}
+
+.tab-btn.active {
+  background: var(--verde);
+  color: white;
+}
+
+/* Rateio */
+.rateio-box {
+  background: var(--verde-bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.rateio-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.rateio-row:last-child {
+  border-bottom: none;
+}
+
+.rateio-label {
+  color: var(--cinza-5);
+}
+
+.rateio-value {
+  font-weight: 600;
+  color: var(--verde-escuro);
+  font-family: monospace;
+}
+
+/* Notificação */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 8px;
+  padding: 12px 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 2000;
+  transform: translateX(120%);
+  transition: transform 0.3s;
+}
+
+.notification.show {
+  transform: translateX(0);
+}
+
+.notification.success {
+  border-left: 4px solid var(--verde);
+}
+
+.notification.error {
+  border-left: 4px solid var(--vermelho);
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--cinza-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--cinza-2);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Utilitários */
+.text-muted { color: var(--cinza-4); }
+.text-verde { color: var(--verde); }
+.text-vermelho { color: var(--vermelho); }
+.fw-600 { font-weight: 600; }
+.font-mono { font-family: monospace; }
+.mt-4 { margin-top: 16px; }
+.mb-4 { margin-bottom: 16px; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.justify-between { justify-content: space-between; }
+.items-center { align-items: center; }
+
+/* Page sections */
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+  .main-content {
+    margin-left: 0;
+  }
+  .grid-2, .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Gráfico */
+.chart-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  justify-content: center;
+  height: 200px;
+}
+
+.chart-bar {
+  flex: 1;
+  text-align: center;
+}
+
+.chart-bar .bar {
+  background: var(--verde);
+  border-radius: 6px 6px 0 0;
+  transition: height 0.3s;
+}
+
+.chart-bar .bar.amarelo {
+  background: var(--amarelo);
+}
+
+.chart-bar .label {
+  font-size: 11px;
+  margin-top: 8px;
+  color: var(--cinza-4);
+}
+</style>
+</head>
+<body>
+
+<!-- Tela de Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">🥚</div>
+      <h1>OVONORTE</h1>
+      <p>Sistema de Gestão Avícola</p>
+    </div>
+    <div id="error-msg" class="error-msg"></div>
+    <div class="form-group">
+      <label>E-mail</label>
+      <input type="email" id="email" placeholder="seu@email.com">
+    </div>
+    <div class="form-group">
+      <label>Senha</label>
+      <input type="password" id="senha" placeholder="••••••">
+    </div>
+    <button class="btn btn-primary" onclick="fazerLogin()">Entrar no Sistema</button>
+    <p style="text-align:center; margin-top:20px; font-size:12px; color:var(--cinza-4);">
+      Demo: diretor@ovonorte.com.br / 123456
+    </p>
+  </div>
+</div>
+
+<!-- App Principal -->
+<div id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="icon">🥚</div>
+        <div><h2>OVONORTE</h2><small>Gestão Avícola</small></div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title">Principal</div>
+        <div class="nav-item" data-page="dashboard"><i class="fa fa-tachometer-alt"></i> Dashboard</div>
+        <div class="nav-item" data-page="aves"><i class="fa fa-feather"></i> Controle de Aves</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Produção</div>
+        <div class="nav-item" data-page="ovos"><i class="fa fa-egg"></i> Coleta de Ovos</div>
+        <div class="nav-item" data-page="racao"><i class="fa fa-wheat-alt"></i> Ração e Água</div>
+        <div class="nav-item" data-page="medicacao"><i class="fa fa-syringe"></i> Medicação</div>
+        <div class="nav-item" data-page="mortalidade"><i class="fa fa-skull"></i> Mortalidade</div>
+        <div class="nav-item" data-page="custos"><i class="fa fa-dollar-sign"></i> Custos</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Análises</div>
+        <div class="nav-item" data-page="custo-unitario"><i class="fa fa-calculator"></i> Custo Unitário</div>
+        <div class="nav-item" data-page="rateio"><i class="fa fa-chart-line"></i> Rateio Detalhado</div>
+        <div class="nav-item" data-page="relatorios"><i class="fa fa-file-alt"></i> Relatórios</div>
+      </div>
+      <div class="nav-section" id="admin-section" style="display:none">
+        <div class="nav-section-title">Administração</div>
+        <div class="nav-item" data-page="usuarios"><i class="fa fa-users"></i> Usuários</div>
+        <div class="nav-item" data-page="lotes"><i class="fa fa-boxes"></i> Lotes</div>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">AD</div>
+        <div>
+          <div class="user-name" id="user-name">Usuário</div>
+          <div class="user-role" id="user-role">Função</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="fazerLogout()"><i class="fa fa-sign-out-alt"></i> Sair</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <h1 id="page-title">Dashboard</h1>
+        <div class="topbar-meta" id="page-meta">Visão geral do sistema</div>
+      </div>
+      <div class="badge badge-verde" id="lote-badge">Carregando...</div>
+    </div>
+    <div class="content-area" id="content-area"></div>
+  </div>
+</div>
+
+<div id="notification" class="notification">
+  <i class="fa fa-check-circle"></i>
+  <span id="notify-msg"></span>
+</div>
+
+<script>
+// ============================================
+// BANCO DE DADOS
+// ============================================
+
+let usuarioAtual = null;
+
+let dados = {
+  usuarios: [],
+  lotes: [],
+  aves: [],
+  ovos: [],
+  racoes: [],
+  medicacoes: [],
+  mortalidades: [],
+  custos: []
+};
+
+function salvarDados() {
+  localStorage.setItem('ovonorte_db', JSON.stringify(dados));
+}
+
+function carregarDados() {
+  const saved = localStorage.getItem('ovonorte_db');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    dados.usuarios = parsed.usuarios || [];
+    dados.lotes = parsed.lotes || [];
+    dados.aves = parsed.aves || [];
+    dados.ovos = parsed.ovos || [];
+    dados.racoes = parsed.racoes || [];
+    dados.medicacoes = parsed.medicacoes || [];
+    dados.mortalidades = parsed.mortalidades || [];
+    dados.custos = parsed.custos || [];
+  }
+  
+  // Dados padrão
+  if (dados.usuarios.length === 0) {
+    dados.usuarios = [
+      { id: '1', nome: 'Administrador', email: 'diretor@ovonorte.com.br', senha: '123456', funcao: 'diretor' },
+      { id: '2', nome: 'Maurício Santana', email: 'mauricio.santana7@gmail.com', senha: 'admin123', funcao: 'diretor' },
+      { id: '3', nome: 'Gerente', email: 'gerente@ovonorte.com.br', senha: '123456', funcao: 'gerente' },
+      { id: '4', nome: 'Colaborador', email: 'colaborador@ovonorte.com.br', senha: '123456', funcao: 'colaborador' }
+    ];
+  }
+  
+  if (dados.lotes.length === 0) {
+    dados.lotes = [{
+      id: 'l1',
+      nome: 'Lote Principal',
+      raca: 'ISA Brown',
+      ativo: true
+    }];
+  }
+  
+  if (dados.aves.length === 0) {
+    dados.aves = [{
+      id: 'a1',
+      data: new Date().toISOString().split('T')[0],
+      quantidade: 500,
+      loteId: 'l1',
+      tipo: 'entrada',
+      observacao: 'Lote inicial'
+    }];
+  }
+  
+  salvarDados();
+}
+
+function getLoteAtivo() {
+  return dados.lotes.find(l => l.ativo) || dados.lotes[0];
+}
+
+function getTotalAves() {
+  let total = 0;
+  const lotesAtivos = dados.lotes.filter(l => l.ativo);
+  for (const lote of lotesAtivos) {
+    const entradas = dados.aves.filter(a => a.loteId === lote.id && a.tipo === 'entrada').reduce((s, a) => s + a.quantidade, 0);
+    const saidas = dados.aves.filter(a => a.loteId === lote.id && a.tipo === 'saida').reduce((s, a) => s + a.quantidade, 0);
+    total += entradas - saidas;
+  }
+  const mortes = dados.mortalidades.reduce((s, m) => s + (m.qtd || 0), 0);
+  return Math.max(0, total - mortes);
+}
+
+function getHistoricoAves() {
+  return dados.aves.sort((a,b) => a.data.localeCompare(b.data));
+}
+
+function formatarMoeda(valor) {
+  if (isNaN(valor)) return 'R$ 0,00';
+  return 'R$ ' + valor.toFixed(2).replace('.', ',');
+}
+
+function formatarData(data) {
+  if (!data) return '—';
+  const partes = data.split('-');
+  if (partes.length !== 3) return data;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function mostrarNotificacao(msg, tipo = 'success') {
+  const notif = document.getElementById('notification');
+  notif.querySelector('span').textContent = msg;
+  notif.className = `notification ${tipo}`;
+  notif.classList.add('show');
+  setTimeout(() => notif.classList.remove('show'), 3000);
+}
+
+// ============================================
+// AUTENTICAÇÃO
+// ============================================
+
+function fazerLogin() {
+  const email = document.getElementById('email').value.trim();
+  const senha = document.getElementById('senha').value;
+  
+  const usuario = dados.usuarios.find(u => u.email === email && u.senha === senha);
+  
+  if (usuario) {
+    usuarioAtual = usuario;
+    localStorage.setItem('ovonorte_session', JSON.stringify({ id: usuario.id, nome: usuario.nome, funcao: usuario.funcao }));
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    
+    document.getElementById('user-avatar').textContent = usuario.nome.substring(0, 2).toUpperCase();
+    document.getElementById('user-name').textContent = usuario.nome;
+    document.getElementById('user-role').textContent = usuario.funcao === 'diretor' ? 'Diretor' : usuario.funcao === 'gerente' ? 'Gerente' : 'Colaborador';
+    
+    if (usuario.funcao === 'diretor' || usuario.funcao === 'gerente') {
+      document.getElementById('admin-section').style.display = 'block';
+    }
+    
+    mudarPagina('dashboard');
+  } else {
+    const errorDiv = document.getElementById('error-msg');
+    errorDiv.textContent = 'E-mail ou senha incorretos';
+    errorDiv.style.display = 'block';
+    setTimeout(() => errorDiv.style.display = 'none', 3000);
+  }
+}
+
+function fazerLogout() {
+  localStorage.removeItem('ovonorte_session');
+  usuarioAtual = null;
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('email').value = '';
+  document.getElementById('senha').value = '';
+}
+
+// ============================================
+// NAVEGAÇÃO
+// ============================================
+
+function mudarPagina(pagina) {
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+  document.querySelector(`.nav-item[data-page="${pagina}"]`)?.classList.add('active');
+  
+  const titulos = {
+    dashboard: 'Dashboard',
+    aves: 'Controle de Aves',
+    ovos: 'Coleta de Ovos',
+    racao: 'Ração e Água',
+    medicacao: 'Medicação',
+    mortalidade: 'Mortalidade',
+    custos: 'Custos e Despesas',
+    custoUnitario: 'Custo Unitário de Produção',
+    rateio: 'Rateio Detalhado',
+    relatorios: 'Relatórios',
+    usuarios: 'Usuários',
+    lotes: 'Lotes'
+  };
+  
+  document.getElementById('page-title').textContent = titulos[pagina] || 'Sistema';
+  document.getElementById('page-meta').textContent = 'Gerenciamento completo';
+  
+  const container = document.getElementById('content-area');
+  
+  if (pagina === 'dashboard') renderDashboard(container);
+  else if (pagina === 'aves') renderAves(container);
+  else if (pagina === 'ovos') renderOvos(container);
+  else if (pagina === 'racao') renderRacao(container);
+  else if (pagina === 'medicacao') renderMedicacao(container);
+  else if (pagina === 'mortalidade') renderMortalidade(container);
+  else if (pagina === 'custos') renderCustos(container);
+  else if (pagina === 'custoUnitario') renderCustoUnitario(container);
+  else if (pagina === 'rateio') renderRateio(container);
+  else if (pagina === 'relatorios') renderRelatorios(container);
+  else if (pagina === 'usuarios') renderUsuarios(container);
+  else if (pagina === 'lotes') renderLotes(container);
+}
+
+// ============================================
+// DASHBOARD
+// ============================================
+
+function renderDashboard(container) {
+  const lote = getLoteAtivo();
+  const aves = getTotalAves();
+  const hoje = new Date().toISOString().split('T')[0];
+  const mesInicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  
+  const ovosHoje = dados.ovos.filter(o => o.data === hoje).reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+  const ovosMes = dados.ovos.filter(o => o.data >= mesInicio).reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+  const custosMes = dados.custos.filter(c => c.data >= mesInicio).reduce((s, c) => s + (c.valor || 0), 0);
+  const mortesMes = dados.mortalidades.filter(m => m.data >= mesInicio).reduce((s, m) => s + (m.qtd || 0), 0);
+  
+  const custoPorAve = aves > 0 ? custosMes / aves : 0;
+  const custoPorOvo = ovosMes > 0 ? custosMes / ovosMes : 0;
+  const produtividade = aves > 0 ? ((ovosMes / aves / 30) * 100).toFixed(1) : 0;
+  
+  document.getElementById('lote-badge').innerHTML = `🐔 ${lote?.nome || 'Sem lote'} | ${aves} aves`;
+  
+  // Gráfico semanal
+  const semanas = [];
+  for (let i = 6; i >= 0; i--) {
+    const data = new Date();
+    data.setDate(data.getDate() - (i * 7));
+    const inicioSemana = new Date(data);
+    inicioSemana.setDate(data.getDate() - data.getDay());
+    const fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(inicioSemana.getDate() + 6);
+    const total = dados.ovos.filter(o => o.data >= inicioSemana.toISOString().split('T')[0] && o.data <= fimSemana.toISOString().split('T')[0])
+      .reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+    semanas.push(total);
+  }
+  const maxValor = Math.max(...semanas, 1);
+  
+  container.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Galinhas Ativas</div><div class="kpi-value">${aves}</div><div class="kpi-sub">${lote?.nome || ''}</div><i class="fa fa-feather kpi-icon"></i></div>
+      <div class="kpi-card amarelo"><div class="kpi-label">Ovos Hoje</div><div class="kpi-value">${ovosHoje}</div><div class="kpi-sub">Coleta do dia</div><i class="fa fa-egg kpi-icon"></i></div>
+      <div class="kpi-card"><div class="kpi-label">Ovos no Mês</div><div class="kpi-value">${ovosMes}</div><div class="kpi-sub">Mês atual</div><i class="fa fa-calendar kpi-icon"></i></div>
+      <div class="kpi-card azul"><div class="kpi-label">Custo por Ave</div><div class="kpi-value">${formatarMoeda(custoPorAve)}</div><div class="kpi-sub">Mês atual</div><i class="fa fa-calculator kpi-icon"></i></div>
+      <div class="kpi-card azul"><div class="kpi-label">Custo por Ovo</div><div class="kpi-value">${formatarMoeda(custoPorOvo)}</div><div class="kpi-sub">Mês atual</div><i class="fa fa-coins kpi-icon"></i></div>
+      <div class="kpi-card vermelho"><div class="kpi-label">Produtividade</div><div class="kpi-value">${produtividade}%</div><div class="kpi-sub">Ovos/ave/dia</div><i class="fa fa-chart-line kpi-icon"></i></div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">📊 Produção Semanal</div>
+        <div class="card-body">
+          <div class="chart-container">
+            ${semanas.map((v, i) => `<div class="chart-bar"><div class="bar" style="height:${Math.max(30, (v/maxValor)*150)}px"></div><div class="label">S${7-i}</div><div class="label">${v}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Últimos Lançamentos</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th></tr></thead>
+            <tbody id="recentes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">ℹ️ Resumo do Lote</div>
+      <div class="card-body">
+        <div class="grid-3">
+          <div><strong>Lote Ativo:</strong> ${lote?.nome || '—'}</div>
+          <div><strong>Raça:</strong> ${lote?.raca || '—'}</div>
+          <div><strong>Total Aves:</strong> ${aves}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const recentes = [
+    ...dados.ovos.slice(-5).map(o => ({ data: o.data, tipo: 'Coleta de Ovos', valor: `${(o.inteiros||0)+(o.trincados||0)} ovos` })),
+    ...dados.custos.slice(-5).map(c => ({ data: c.data, tipo: c.descricao, valor: formatarMoeda(c.valor) }))
+  ].sort((a,b) => b.data.localeCompare(a.data)).slice(0,8);
+  
+  document.getElementById('recentes-tbody').innerHTML = recentes.map(r => `<tr><td>${formatarData(r.data)}</td><td>${r.tipo}</td><td>${r.valor}</td></tr>`).join('');
+}
+
+// ============================================
+// CONTROLE DE AVES
+// ============================================
+
+function renderAves(container) {
+  const avesAtuais = getTotalAves();
+  const historico = getHistoricoAves();
+  
+  container.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total de Aves</div><div class="kpi-value">${avesAtuais}</div><div class="kpi-sub">Ativas atualmente</div><i class="fa fa-feather kpi-icon"></i></div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">➕ Registrar Movimentação</div>
+        <div class="card-body">
+          <div class="form-group"><label>Data</label><input type="date" id="ave-data" value="${new Date().toISOString().split('T')[0]}"></div>
+          <div class="form-group"><label>Tipo</label><select id="ave-tipo"><option value="entrada">Entrada (Novas Aves)</option><option value="saida">Saída (Venda/Descarte)</option></select></div>
+          <div class="form-group"><label>Quantidade</label><input type="number" id="ave-qtd" min="1" placeholder="Número de aves"></div>
+          <div class="form-group"><label>Observação</label><textarea id="ave-obs" rows="2" placeholder="Motivo da movimentação..."></textarea></div>
+          <button class="btn btn-primary" onclick="salvarMovimentacaoAves()"><i class="fa fa-save"></i> Registrar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Histórico de Movimentações</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Quantidade</th><th>Observação</th></tr></thead>
+            <tbody id="aves-tbody"></tbody>
+          <table>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">📊 Evolução do Plantel</div>
+      <div class="card-body">
+        <div id="evolucao-grafico" style="height:200px;"></div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('aves-tbody').innerHTML = historico.map(a => `
+    <tr>
+      <td>${formatarData(a.data)}</td>
+      <td><span class="badge ${a.tipo === 'entrada' ? 'badge-verde' : 'badge-vermelho'}">${a.tipo === 'entrada' ? '➕ Entrada' : '➖ Saída'}</span></td>
+      <td>${a.quantidade}</td>
+      <td>${a.observacao || '—'}</td>
+    </tr>
+  `).join('');
+  
+  // Gráfico de evolução
+  let acumulado = 0;
+  const evolucao = [];
+  const entradas = dados.aves.filter(a => a.tipo === 'entrada');
+  const saidas = dados.aves.filter(a => a.tipo === 'saida');
+  const mortes = dados.mortalidades;
+  
+  // Simplificar: mostrar evolução por mês
+  const meses = {};
+  [...entradas, ...saidas, ...mortes].forEach(item => {
+    const mes = item.data.substring(0, 7);
+    if (!meses[mes]) meses[mes] = { entradas: 0, saidas: 0, mortes: 0 };
+    if (item.tipo === 'entrada') meses[mes].entradas += item.quantidade;
+    else if (item.tipo === 'saida') meses[mes].saidas += item.quantidade;
+    else if (item.qtd) meses[mes].mortes += item.qtd;
+  });
+  
+  let total = 0;
+  const labels = Object.keys(meses).sort();
+  const valores = labels.map(mes => {
+    total += (meses[mes].entradas || 0) - (meses[mes].saidas || 0) - (meses[mes].mortes || 0);
+    return total;
+  });
+  
+  const maxValor = Math.max(...valores, 1);
+  document.getElementById('evolucao-grafico').innerHTML = `
+    <div class="chart-container">
+      ${valores.map(v => `<div class="chart-bar"><div class="bar" style="height:${Math.max(20, (v/maxValor)*150)}px; background:var(--verde);"></div><div class="label" style="font-size:10px;">${labels[valores.indexOf(v)]?.substring(5)}</div><div class="label">${v}</div></div>`).join('')}
+    </div>
+  `;
+}
+
+function salvarMovimentacaoAves() {
+  const data = document.getElementById('ave-data').value;
+  const tipo = document.getElementById('ave-tipo').value;
+  const quantidade = parseInt(document.getElementById('ave-qtd').value) || 0;
+  const observacao = document.getElementById('ave-obs').value;
+  const lote = getLoteAtivo();
+  
+  if (quantidade <= 0) {
+    mostrarNotificacao('Informe a quantidade', 'error');
+    return;
+  }
+  
+  dados.aves.push({
+    id: Date.now().toString(),
+    data,
+    tipo,
+    quantidade,
+    observacao,
+    loteId: lote.id
+  });
+  
+  salvarDados();
+  mostrarNotificacao(`Movimentação registrada: ${tipo === 'entrada' ? '+' : '-'}${quantidade} aves`);
+  document.getElementById('ave-qtd').value = '';
+  document.getElementById('ave-obs').value = '';
+  mudarPagina('aves');
+}
+
+// ============================================
+// COLETA DE OVOS
+// ============================================
+
+function renderOvos(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  const ovosLista = [...dados.ovos].sort((a,b) => b.data.localeCompare(a.data));
+  
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">📝 Registrar Coleta</div>
+        <div class="card-body">
+          <div class="form-group"><label>Data</label><input type="date" id="data-ovo" value="${hoje}"></div>
+          <div class="form-group"><label>Ovos Inteiros</label><input type="number" id="inteiros" value="0" min="0"></div>
+          <div class="form-group"><label>Ovos Trincados</label><input type="number" id="trincados" value="0" min="0"></div>
+          <div class="form-group"><label>Observações</label><textarea id="ovo-obs" rows="2"></textarea></div>
+          <button class="btn btn-primary" onclick="salvarOvo()"><i class="fa fa-save"></i> Registrar Coleta</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Histórico de Coletas</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Inteiros</th><th>Trincados</th><th>Total</th><th>Produtividade</th></tr></thead>
+            <tbody id="ovos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const aves = getTotalAves();
+  document.getElementById('ovos-tbody').innerHTML = ovosLista.map(o => {
+    const total = (o.inteiros || 0) + (o.trincados || 0);
+    const produtividade = aves > 0 ? ((total / aves) * 100).toFixed(1) : 0;
+    return `<tr>
+      <td>${formatarData(o.data)}</td>
+      <td>${o.inteiros || 0}</td>
+      <td>${o.trincados || 0}</td>
+      <td><strong>${total}</strong></td>
+      <td>${produtividade}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function salvarOvo() {
+  const data = document.getElementById('data-ovo').value;
+  const inteiros = parseInt(document.getElementById('inteiros').value) || 0;
+  const trincados = parseInt(document.getElementById('trincados').value) || 0;
+  const obs = document.getElementById('ovo-obs').value;
+  
+  if (inteiros + trincados === 0) {
+    mostrarNotificacao('Informe a quantidade de ovos', 'error');
+    return;
+  }
+  
+  dados.ovos.push({
+    id: Date.now().toString(),
+    data,
+    inteiros,
+    trincados,
+    obs
+  });
+  salvarDados();
+  mostrarNotificacao('Coleta registrada com sucesso!');
+  document.getElementById('inteiros').value = '0';
+  document.getElementById('trincados').value = '0';
+  mudarPagina('ovos');
+}
+
+// ============================================
+// RAÇÃO E ÁGUA
+// ============================================
+
+function renderRacao(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  const aves = getTotalAves();
+  const racoesLista = [...dados.racoes].sort((a,b) => b.data.localeCompare(a.data));
+  
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">🌾 Lançar Consumo com Rateio</div>
+        <div class="card-body">
+          <div class="alert alert-info"><i class="fa fa-info-circle"></i> O custo será rateado entre ${aves} aves ativas</div>
+          <div class="form-group"><label>Data</label><input type="date" id="data-ra" value="${hoje}"></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Ração (kg)</label><input type="number" id="racao-kg" step="0.1" value="0"></div>
+            <div class="form-group"><label>Custo Ração (R$)</label><input type="number" id="racao-custo" step="0.01" value="0"></div>
+            <div class="form-group"><label>Água (L)</label><input type="number" id="agua-l" step="0.1" value="0"></div>
+            <div class="form-group"><label>Custo Água (R$)</label><input type="number" id="agua-custo" step="0.01" value="0"></div>
+          </div>
+          <button class="btn btn-primary" onclick="salvarRacao()"><i class="fa fa-save"></i> Registrar Consumo</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Histórico de Consumo</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Ração (kg)</th><th>Custo R$</th><th>Água (L)</th><th>Custo Água</th><th>Custo/Ave</th></tr></thead>
+            <tbody id="racao-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('racao-tbody').innerHTML = racoesLista.map(r => {
+    const custoPorAve = r.custoPorAve || ((r.racaoCusto + r.aguaCusto) / aves);
+    return `<tr>
+      <td>${formatarData(r.data)}</td>
+      <td>${(r.racaoKg || 0).toFixed(1)}</td>
+      <td>${formatarMoeda(r.racaoCusto)}</td>
+      <td>${(r.aguaL || 0).toFixed(1)}</td>
+      <td>${formatarMoeda(r.aguaCusto)}</td>
+      <td class="fw-600">${formatarMoeda(custoPorAve)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function salvarRacao() {
+  const data = document.getElementById('data-ra').value;
+  const racaoKg = parseFloat(document.getElementById('racao-kg').value) || 0;
+  const racaoCusto = parseFloat(document.getElementById('racao-custo').value) || 0;
+  const aguaL = parseFloat(document.getElementById('agua-l').value) || 0;
+  const aguaCusto = parseFloat(document.getElementById('agua-custo').value) || 0;
+  const aves = getTotalAves();
+  
+  if (racaoKg === 0 && aguaL === 0) {
+    mostrarNotificacao('Informe pelo menos um consumo', 'error');
+    return;
+  }
+  
+  const custoPorAve = aves > 0 ? (racaoCusto + aguaCusto) / aves : 0;
+  
+  dados.racoes.push({
+    id: Date.now().toString(),
+    data,
+    racaoKg,
+    racaoCusto,
+    aguaL,
+    aguaCusto,
+    custoPorAve
+  });
+  
+  if (racaoCusto > 0) {
+    dados.custos.push({
+      id: Date.now().toString() + '_r',
+      data,
+      categoria: 'racao',
+      descricao: `Ração (${racaoKg}kg)`,
+      valor: racaoCusto
+    });
+  }
+  if (aguaCusto > 0) {
+    dados.custos.push({
+      id: Date.now().toString() + '_a',
+      data,
+      categoria: 'agua',
+      descricao: `Água (${aguaL}L)`,
+      valor: aguaCusto
+    });
+  }
+  
+  salvarDados();
+  mostrarNotificacao(`Consumo registrado! Custo por ave: ${formatarMoeda(custoPorAve)}`);
+  document.getElementById('racao-kg').value = '0';
+  document.getElementById('racao-custo').value = '0';
+  document.getElementById('agua-l').value = '0';
+  document.getElementById('agua-custo').value = '0';
+  mudarPagina('racao');
+}
+
+// ============================================
+// MEDICAÇÃO
+// ============================================
+
+function renderMedicacao(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">💊 Registrar Medicação</div>
+        <div class="card-body">
+          <div class="form-group"><label>Data</label><input type="date" id="data-med" value="${hoje}"></div>
+          <div class="form-group"><label>Produto</label><input type="text" id="produto" placeholder="Nome do medicamento"></div>
+          <div class="form-group"><label>Finalidade</label><select id="finalidade"><option>Antifúngico</option><option>Vacina</option><option>Antibiótico</option><option>Vitaminas</option><option>Outro</option></select></div>
+          <div class="form-group"><label>Custo Total (R$)</label><input type="number" id="custo-med" step="0.01"></div>
+          <div class="form-group"><label>Aves Tratadas</label><input type="number" id="aves-tratadas" placeholder="Deixe em branco para todas"></div>
+          <button class="btn btn-primary" onclick="salvarMedicacao()"><i class="fa fa-save"></i> Registrar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Histórico de Medicações</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Produto</th><th>Finalidade</th><th>Custo Total</th><th>Custo/Ave</th></tr></thead>
+            <tbody id="med-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const aves = getTotalAves();
+  document.getElementById('med-tbody').innerHTML = dados.medicacoes.map(m => {
+    const avesTratadas = m.avesTratadas || aves;
+    const custoPorAve = m.custo / avesTratadas;
+    return `<tr>
+      <td>${formatarData(m.data)}</td>
+      <td>${m.produto}</td>
+      <td>${m.finalidade}</td>
+      <td>${formatarMoeda(m.custo)}</td>
+      <td>${formatarMoeda(custoPorAve)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function salvarMedicacao() {
+  const data = document.getElementById('data-med').value;
+  const produto = document.getElementById('produto').value;
+  const finalidade = document.getElementById('finalidade').value;
+  const custo = parseFloat(document.getElementById('custo-med').value) || 0;
+  const avesTratadas = parseInt(document.getElementById('aves-tratadas').value) || getTotalAves();
+  
+  if (!produto) {
+    mostrarNotificacao('Informe o produto', 'error');
+    return;
+  }
+  
+  dados.medicacoes.push({
+    id: Date.now().toString(),
+    data,
+    produto,
+    finalidade,
+    custo,
+    avesTratadas
+  });
+  
+  if (custo > 0) {
+    dados.custos.push({
+      id: Date.now().toString(),
+      data,
+      categoria: 'medicamento',
+      descricao: `Medicação: ${produto}`,
+      valor: custo
+    });
+  }
+  
+  salvarDados();
+  mostrarNotificacao('Medicação registrada');
+  document.getElementById('produto').value = '';
+  document.getElementById('custo-med').value = '';
+  mudarPagina('medicacao');
+}
+
+// ============================================
+// MORTALIDADE
+// ============================================
+
+function renderMortalidade(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  const aves = getTotalAves();
+  const totalMortes = dados.mortalidades.reduce((s, m) => s + (m.qtd || 0), 0);
+  const percMort = aves > 0 ? ((totalMortes / (aves + totalMortes)) * 100).toFixed(1) : 0;
+  
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">⚠️ Registrar Mortalidade</div>
+        <div class="card-body">
+          <div class="alert alert-warning"><i class="fa fa-exclamation-triangle"></i> Mortalidade atual: ${percMort}% do total</div>
+          <div class="form-group"><label>Data</label><input type="date" id="data-mort" value="${hoje}"></div>
+          <div class="form-group"><label>Quantidade</label><input type="number" id="qtd-mort" min="1"></div>
+          <div class="form-group"><label>Causa</label><select id="causa-mort"><option>Doença</option><option>Estresse térmico</option><option>Acidente</option><option>Predador</option><option>Causa desconhecida</option></select></div>
+          <div class="form-group"><label>Observações</label><textarea id="mort-obs" rows="2"></textarea></div>
+          <button class="btn btn-primary" onclick="salvarMortalidade()"><i class="fa fa-save"></i> Registrar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Histórico de Mortalidade</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Quantidade</th><th>Causa</th></tr></thead>
+            <tbody id="mort-tbody"></tbody>
+          </table>
+          <div class="rateio-box" style="margin:0; border-radius:0;">
+            <div class="rateio-row"><span class="rateio-label">Total de mortes:</span><span class="rateio-value">${totalMortes} aves</span></div>
+            <div class="rateio-row"><span class="rateio-label">Percentual sobre total:</span><span class="rateio-value">${percMort}%</span></div>
+            <div class="rateio-row"><span class="rateio-label">Aves atuais:</span><span class="rateio-value">${aves}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('mort-tbody').innerHTML = dados.mortalidades.map(m => `
+    <tr><td>${formatarData(m.data)}</td><td class="fw-600 text-vermelho">${m.qtd}</td><td>${m.causa || '—'}</td></tr>
+  `).join('');
+}
+
+function salvarMortalidade() {
+  const data = document.getElementById('data-mort').value;
+  const qtd = parseInt(document.getElementById('qtd-mort').value) || 0;
+  const causa = document.getElementById('causa-mort').value;
+  const obs = document.getElementById('mort-obs').value;
+  
+  if (qtd <= 0) {
+    mostrarNotificacao('Informe a quantidade', 'error');
+    return;
+  }
+  
+  dados.mortalidades.push({
+    id: Date.now().toString(),
+    data,
+    qtd,
+    causa,
+    obs
+  });
+  salvarDados();
+  mostrarNotificacao('Mortalidade registrada');
+  document.getElementById('qtd-mort').value = '';
+  mudarPagina('mortalidade');
+}
+
+// ============================================
+// CUSTOS
+// ============================================
+
+function renderCustos(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  const custosLista = [...dados.custos].sort((a,b) => b.data.localeCompare(a.data));
+  const totalCustos = dados.custos.reduce((s, c) => s + (c.valor || 0), 0);
+  
+  container.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card azul"><div class="kpi-label">Total de Custos</div><div class="kpi-value">${formatarMoeda(totalCustos)}</div><div class="kpi-sub">Histórico completo</div><i class="fa fa-dollar-sign kpi-icon"></i></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">💰 Lançar Custo/Despesa</div>
+        <div class="card-body">
+          <div class="form-group"><label>Data</label><input type="date" id="data-custo" value="${hoje}"></div>
+          <div class="form-group"><label>Categoria</label><select id="categoria-custo"><option>racao</option><option>agua</option><option>medicamento</option><option>energia</option><option>mao_de_obra</option><option>manutencao</option><option>outros</option></select></div>
+          <div class="form-group"><label>Descrição</label><input type="text" id="desc-custo" placeholder="Descreva o gasto"></div>
+          <div class="form-group"><label>Valor (R$)</label><input type="number" id="valor-custo" step="0.01" placeholder="0,00"></div>
+          <button class="btn btn-primary" onclick="salvarCusto()"><i class="fa fa-save"></i> Registrar Custo</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Últimos Custos</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr></thead>
+            <tbody id="custos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('custos-tbody').innerHTML = custosLista.slice(0, 20).map(c => `
+    <tr>
+      <td>${formatarData(c.data)}</td>
+      <td><span class="badge badge-verde">${c.categoria}</span></td>
+      <td>${c.descricao}</td>
+      <td class="font-mono">${formatarMoeda(c.valor)}</td>
+    </tr>
+  `).join('');
+}
+
+function salvarCusto() {
+  const data = document.getElementById('data-custo').value;
+  const categoria = document.getElementById('categoria-custo').value;
+  const descricao = document.getElementById('desc-custo').value;
+  const valor = parseFloat(document.getElementById('valor-custo').value) || 0;
+  
+  if (!descricao || valor <= 0) {
+    mostrarNotificacao('Preencha todos os campos', 'error');
+    return;
+  }
+  
+  dados.custos.push({
+    id: Date.now().toString(),
+    data,
+    categoria,
+    descricao,
+    valor
+  });
+  salvarDados();
+  mostrarNotificacao('Custo registrado');
+  document.getElementById('desc-custo').value = '';
+  document.getElementById('valor-custo').value = '';
+  mudarPagina('custos');
+}
+
+// ============================================
+// CUSTO UNITÁRIO
+// ============================================
+
+let filtroPeriodo = 'mes';
+
+function renderCustoUnitario(container) {
+  const aves = getTotalAves();
+  const hoje = new Date();
+  let dataInicio, dataFim = hoje.toISOString().split('T')[0];
+  
+  if (filtroPeriodo === 'dia') {
+    dataInicio = dataFim;
+  } else if (filtroPeriodo === 'mes') {
+    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+  } else if (filtroPeriodo === 'ano') {
+    dataInicio = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
+  } else {
+    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+    dataFim = hoje.toISOString().split('T')[0];
+  }
+  
+  const custosPeriodo = dados.custos.filter(c => c.data >= dataInicio && c.data <= dataFim);
+  const ovosPeriodo = dados.ovos.filter(o => o.data >= dataInicio && o.data <= dataFim);
+  const racoesPeriodo = dados.racoes.filter(r => r.data >= dataInicio && r.data <= dataFim);
+  const medicacoesPeriodo = dados.medicacoes.filter(m => m.data >= dataInicio && m.data <= dataFim);
+  
+  const totalCustos = custosPeriodo.reduce((s, c) => s + (c.valor || 0), 0);
+  const totalOvos = ovosPeriodo.reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+  const totalRacaoKg = racoesPeriodo.reduce((s, r) => s + (r.racaoKg || 0), 0);
+  const totalRacaoCusto = racoesPeriodo.reduce((s, r) => s + (r.racaoCusto || 0), 0);
+  const totalAguaL = racoesPeriodo.reduce((s, r) => s + (r.aguaL || 0), 0);
+  const totalAguaCusto = racoesPeriodo.reduce((s, r) => s + (r.aguaCusto || 0), 0);
+  const totalMedicacao = medicacoesPeriodo.reduce((s, m) => s + (m.custo || 0), 0);
+  
+  const custoPorAve = aves > 0 ? totalCustos / aves : 0;
+  const custoPorOvo = totalOvos > 0 ? totalCustos / totalOvos : 0;
+  const racaoPorAve = aves > 0 ? totalRacaoKg / aves : 0;
+  const custoRacaoPorAve = aves > 0 ? totalRacaoCusto / aves : 0;
+  const aguaPorAve = aves > 0 ? totalAguaL / aves : 0;
+  const custoAguaPorAve = aves > 0 ? totalAguaCusto / aves : 0;
+  const custoMedPorAve = aves > 0 ? totalMedicacao / aves : 0;
+  const produtividade = aves > 0 ? ((totalOvos / aves / 30) * 100).toFixed(1) : 0;
+  
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📊 Análise de Custo Unitário</span>
+        <div class="flex gap-2">
+          <button class="btn-secondary btn-sm ${filtroPeriodo === 'dia' ? 'active' : ''}" onclick="setFiltroPeriodo('dia')">Dia</button>
+          <button class="btn-secondary btn-sm ${filtroPeriodo === 'mes' ? 'active' : ''}" onclick="setFiltroPeriodo('mes')">Mês</button>
+          <button class="btn-secondary btn-sm ${filtroPeriodo === 'ano' ? 'active' : ''}" onclick="setFiltroPeriodo('ano')">Ano</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info"><i class="fa fa-calendar"></i> Período: ${formatarData(dataInicio)} a ${formatarData(dataFim)}</div>
+      </div>
+    </div>
+    
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total de Custos</div><div class="kpi-value">${formatarMoeda(totalCustos)}</div><div class="kpi-sub">Período selecionado</div><i class="fa fa-dollar-sign kpi-icon"></i></div>
+      <div class="kpi-card amarelo"><div class="kpi-label">Total de Ovos</div><div class="kpi-value">${totalOvos}</div><div class="kpi-sub">Produção no período</div><i class="fa fa-egg kpi-icon"></i></div>
+      <div class="kpi-card"><div class="kpi-label">Aves Médias</div><div class="kpi-value">${aves}</div><div class="kpi-sub">No período</div><i class="fa fa-feather kpi-icon"></i></div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">📈 Custos por Ave</div>
+        <div class="card-body">
+          <div class="rateio-box">
+            <div class="rateio-row"><span class="rateio-label">Custo Total por Ave:</span><span class="rateio-value">${formatarMoeda(custoPorAve)}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo com Ração por Ave:</span><span class="rateio-value">${formatarMoeda(custoRacaoPorAve)}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo com Água por Ave:</span><span class="rateio-value">${formatarMoeda(custoAguaPorAve)}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo com Medicação por Ave:</span><span class="rateio-value">${formatarMoeda(custoMedPorAve)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📉 Custos por Ovo</div>
+        <div class="card-body">
+          <div class="rateio-box">
+            <div class="rateio-row"><span class="rateio-label">Custo Total por Ovo:</span><span class="rateio-value">${formatarMoeda(custoPorOvo)}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo Ração por Ovo:</span><span class="rateio-value">${formatarMoeda(totalRacaoCusto / Math.max(1, totalOvos))}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo Água por Ovo:</span><span class="rateio-value">${formatarMoeda(totalAguaCusto / Math.max(1, totalOvos))}</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo Medicação por Ovo:</span><span class="rateio-value">${formatarMoeda(totalMedicacao / Math.max(1, totalOvos))}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">🌾 Consumo por Ave</div>
+        <div class="card-body">
+          <div class="rateio-box">
+            <div class="rateio-row"><span class="rateio-label">Ração por Ave:</span><span class="rateio-value">${racaoPorAve.toFixed(2)} kg</span></div>
+            <div class="rateio-row"><span class="rateio-label">Água por Ave:</span><span class="rateio-value">${aguaPorAve.toFixed(2)} L</span></div>
+            <div class="rateio-row"><span class="rateio-label">Produtividade:</span><span class="rateio-value">${produtividade}%</span></div>
+            <div class="rateio-row"><span class="rateio-label">Ovos por Ave no período:</span><span class="rateio-value">${aves > 0 ? (totalOvos / aves).toFixed(1) : 0}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📊 Indicadores de Eficiência</div>
+        <div class="card-body">
+          <div class="rateio-box">
+            <div class="rateio-row"><span class="rateio-label">Custo Ração por kg:</span><span class="rateio-value">${totalRacaoKg > 0 ? formatarMoeda(totalRacaoCusto / totalRacaoKg) : 'R$ 0,00'}/kg</span></div>
+            <div class="rateio-row"><span class="rateio-label">Custo Água por L:</span><span class="rateio-value">${totalAguaL > 0 ? formatarMoeda(totalAguaCusto / totalAguaL) : 'R$ 0,00'}/L</span></div>
+            <div class="rateio-row"><span class="rateio-label">Ração por Ovo:</span><span class="rateio-value">${totalOvos > 0 ? (totalRacaoKg / totalOvos).toFixed(3) : 0} kg/ovo</span></div>
+            <div class="rateio-row"><span class="rateio-label">Água por Ovo:</span><span class="rateio-value">${totalOvos > 0 ? (totalAguaL / totalOvos).toFixed(3) : 0} L/ovo</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function setFiltroPeriodo(periodo) {
+  filtroPeriodo = periodo;
+  renderCustoUnitario(document.getElementById('content-area'));
+}
+
+// ============================================
+// RATEIO DETALHADO
+// ============================================
+
+function renderRateio(container) {
+  const totalCustos = dados.custos.reduce((s, c) => s + (c.valor || 0), 0);
+  const totalOvos = dados.ovos.reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+  const aves = getTotalAves();
+  
+  const custoPorAve = aves > 0 ? totalCustos / aves : 0;
+  const custoPorOvo = totalOvos > 0 ? totalCustos / totalOvos : 0;
+  
+  const categorias = {};
+  dados.custos.forEach(c => {
+    const cat = c.categoria || 'outros';
+    categorias[cat] = (categorias[cat] || 0) + (c.valor || 0);
+  });
+  
+  container.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total de Custos</div><div class="kpi-value">${formatarMoeda(totalCustos)}</div><i class="fa fa-dollar-sign kpi-icon"></i></div>
+      <div class="kpi-card amarelo"><div class="kpi-label">Total de Ovos</div><div class="kpi-value">${totalOvos}</div><i class="fa fa-egg kpi-icon"></i></div>
+      <div class="kpi-card"><div class="kpi-label">Aves Ativas</div><div class="kpi-value">${aves}</div><i class="fa fa-feather kpi-icon"></i></div>
+      <div class="kpi-card azul"><div class="kpi-label">Custo por Ave</div><div class="kpi-value">${formatarMoeda(custoPorAve)}</div><i class="fa fa-calculator kpi-icon"></i></div>
+      <div class="kpi-card azul"><div class="kpi-label">Custo por Ovo</div><div class="kpi-value">${formatarMoeda(custoPorOvo)}</div><i class="fa fa-coins kpi-icon"></i></div>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">📊 Rateio Detalhado por Categoria</div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Categoria</th><th>Valor Total</th><th>% do Total</th><th>Custo por Ave</th><th>Custo por Ovo</th></tr></thead>
+          <tbody>
+            ${Object.entries(categorias).map(([cat, val]) => {
+              const pct = totalCustos > 0 ? ((val / totalCustos) * 100).toFixed(1) : 0;
+              return `<tr>
+                <td><span class="badge badge-verde">${cat}</span></td>
+                <td class="font-mono">${formatarMoeda(val)}</td>
+                <td>${pct}%</td>
+                <td class="font-mono">${formatarMoeda(aves > 0 ? val / aves : 0)}</td>
+                <td class="font-mono">${formatarMoeda(totalOvos > 0 ? val / totalOvos : 0)}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:var(--verde-bg); font-weight:bold;">
+              <td>TOTAL GERAL</td>
+              <td class="font-mono">${formatarMoeda(totalCustos)}</td>
+              <td>100%</td>
+              <td class="font-mono">${formatarMoeda(custoPorAve)}</td>
+              <td class="font-mono">${formatarMoeda(custoPorOvo)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// RELATÓRIOS (com filtros)
+// ============================================
+
+let relatorioFiltro = 'periodo';
+
+function renderRelatorios(container) {
+  const hoje = new Date().toISOString().split('T')[0];
+  
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📄 Gerar Relatórios</span>
+        <div class="tabs">
+          <button class="tab-btn ${relatorioFiltro === 'periodo' ? 'active' : ''}" onclick="setRelatorioFiltro('periodo')">Por Período</button>
+          <button class="tab-btn ${relatorioFiltro === 'mes' ? 'active' : ''}" onclick="setRelatorioFiltro('mes')">Mês Específico</button>
+          <button class="tab-btn ${relatorioFiltro === 'ano' ? 'active' : ''}" onclick="setRelatorioFiltro('ano')">Ano Específico</button>
+          <button class="tab-btn ${relatorioFiltro === 'dia' ? 'active' : ''}" onclick="setRelatorioFiltro('dia')">Dia Específico</button>
+        </div>
+      </div>
+      <div class="card-body" id="filtros-container"></div>
+    </div>
+    <div id="relatorio-resultado" class="card" style="display:none;"></div>
+  `;
+  
+  atualizarFiltrosRelatorio();
+}
+
+function setRelatorioFiltro(tipo) {
+  relatorioFiltro = tipo;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  atualizarFiltrosRelatorio();
+}
+
+function atualizarFiltrosRelatorio() {
+  const container = document.getElementById('filtros-container');
+  const hoje = new Date();
+  
+  if (relatorioFiltro === 'periodo') {
+    const trintaDias = new Date();
+    trintaDias.setDate(hoje.getDate() - 30);
+    container.innerHTML = `
+      <div class="form-grid">
+        <div class="form-group"><label>Data Inicial</label><input type="date" id="rel-inicio" value="${trintaDias.toISOString().split('T')[0]}"></div>
+        <div class="form-group"><label>Data Final</label><input type="date" id="rel-fim" value="${hoje.toISOString().split('T')[0]}"></div>
+      </div>
+      <button class="btn btn-primary" onclick="gerarRelatorioPeriodo()"><i class="fa fa-file-alt"></i> Gerar Relatório</button>
+    `;
+  } else if (relatorioFiltro === 'mes') {
+    container.innerHTML = `
+      <div class="form-group"><label>Selecione o Mês</label><input type="month" id="rel-mes" value="${hoje.toISOString().substring(0,7)}"></div>
+      <button class="btn btn-primary" onclick="gerarRelatorioMes()"><i class="fa fa-file-alt"></i> Gerar Relatório</button>
+    `;
+  } else if (relatorioFiltro === 'ano') {
+    container.innerHTML = `
+      <div class="form-group"><label>Selecione o Ano</label><input type="number" id="rel-ano" value="${hoje.getFullYear()}" min="2020" max="2030"></div>
+      <button class="btn btn-primary" onclick="gerarRelatorioAno()"><i class="fa fa-file-alt"></i> Gerar Relatório</button>
+    `;
+  } else if (relatorioFiltro === 'dia') {
+    container.innerHTML = `
+      <div class="form-group"><label>Selecione o Dia</label><input type="date" id="rel-dia" value="${hoje.toISOString().split('T')[0]}"></div>
+      <button class="btn btn-primary" onclick="gerarRelatorioDia()"><i class="fa fa-file-alt"></i> Gerar Relatório</button>
+    `;
+  }
+}
+
+function gerarRelatorioPeriodo() {
+  const inicio = document.getElementById('rel-inicio').value;
+  const fim = document.getElementById('rel-fim').value;
+  if (!inicio || !fim) return;
+  gerarRelatorioCustom(inicio, fim);
+}
+
+function gerarRelatorioMes() {
+  const mes = document.getElementById('rel-mes').value;
+  if (!mes) return;
+  const [ano, mesNum] = mes.split('-');
+  const inicio = `${ano}-${mesNum}-01`;
+  const ultimoDia = new Date(parseInt(ano), parseInt(mesNum), 0).getDate();
+  const fim = `${ano}-${mesNum}-${ultimoDia}`;
+  gerarRelatorioCustom(inicio, fim);
+}
+
+function gerarRelatorioAno() {
+  const ano = document.getElementById('rel-ano').value;
+  if (!ano) return;
+  const inicio = `${ano}-01-01`;
+  const fim = `${ano}-12-31`;
+  gerarRelatorioCustom(inicio, fim);
+}
+
+function gerarRelatorioDia() {
+  const dia = document.getElementById('rel-dia').value;
+  if (!dia) return;
+  gerarRelatorioCustom(dia, dia);
+}
+
+function gerarRelatorioCustom(inicio, fim) {
+  const lote = getLoteAtivo();
+  const avesMedia = getTotalAves();
+  
+  const custosPeriodo = dados.custos.filter(c => c.data >= inicio && c.data <= fim);
+  const ovosPeriodo = dados.ovos.filter(o => o.data >= inicio && o.data <= fim);
+  const racoesPeriodo = dados.racoes.filter(r => r.data >= inicio && r.data <= fim);
+  const medicacoesPeriodo = dados.medicacoes.filter(m => m.data >= inicio && m.data <= fim);
+  const mortalidadesPeriodo = dados.mortalidades.filter(m => m.data >= inicio && m.data <= fim);
+  
+  const totalCustos = custosPeriodo.reduce((s, c) => s + (c.valor || 0), 0);
+  const totalOvos = ovosPeriodo.reduce((s, o) => s + (o.inteiros || 0) + (o.trincados || 0), 0);
+  const totalRacaoKg = racoesPeriodo.reduce((s, r) => s + (r.racaoKg || 0), 0);
+  const totalRacaoCusto = racoesPeriodo.reduce((s, r) => s + (r.racaoCusto || 0), 0);
+  const totalAguaL = racoesPeriodo.reduce((s, r) => s + (r.aguaL || 0), 0);
+  const totalAguaCusto = racoesPeriodo.reduce((s, r) => s + (r.aguaCusto || 0), 0);
+  const totalMedicacao = medicacoesPeriodo.reduce((s, m) => s + (m.custo || 0), 0);
+  const totalMortes = mortalidadesPeriodo.reduce((s, m) => s + (m.qtd || 0), 0);
+  
+  const dias = Math.max(1, (new Date(fim) - new Date(inicio)) / (1000 * 60 * 60 * 24) + 1);
+  const custoPorAve = avesMedia > 0 ? totalCustos / avesMedia : 0;
+  const custoPorOvo = totalOvos > 0 ? totalCustos / totalOvos : 0;
+  const produtividade = avesMedia > 0 ? ((totalOvos / avesMedia / dias) * 100).toFixed(1) : 0;
+  
+  const porCategoria = {};
+  custosPeriodo.forEach(c => {
+    const cat = c.categoria || 'outros';
+    porCategoria[cat] = (porCategoria[cat] || 0) + (c.valor || 0);
+  });
+  
+  const html = `
+    <div class="card-body" style="text-align:center;">
+      <h2>🥚 OVONORTE</h2>
+      <h3>Relatório de Gestão Avícola</h3>
+      <p><strong>Período:</strong> ${formatarData(inicio)} a ${formatarData(fim)} (${dias} dias)</p>
+      <p><strong>Lote:</strong> ${lote?.nome || '—'} | <strong>Raça:</strong> ${lote?.raca || '—'}</p>
+      <p><strong>Média de Aves no período:</strong> ${avesMedia}</p>
+      <hr style="margin:20px 0;">
+      
+      <div class="grid-3">
+        <div><strong>Total de Custos</strong><br><span style="font-size:24px; color:var(--verde);">${formatarMoeda(totalCustos)}</span></div>
+        <div><strong>Total de Ovos</strong><br><span style="font-size:24px; color:var(--verde);">${totalOvos}</span></div>
+        <div><strong>Total de Mortes</strong><br><span style="font-size:24px; color:var(--vermelho);">${totalMortes}</span></div>
+        <div><strong>Custo por Ave</strong><br>${formatarMoeda(custoPorAve)}</div>
+        <div><strong>Custo por Ovo</strong><br>${formatarMoeda(custoPorOvo)}</div>
+        <div><strong>Produtividade</strong><br>${produtividade}%</div>
+      </div>
+      
+      <hr style="margin:20px 0;">
+      
+      <h3>📊 Detalhamento de Custos</h3>
+      <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+        <thead><tr style="background:var(--verde-escuro); color:white;">
+          <th style="padding:8px;">Categoria</th><th style="padding:8px;">Valor</th><th style="padding:8px;">%</th><th style="padding:8px;">Custo/Ave</th><th style="padding:8px;">Custo/Ovo</th>
+        </tr></thead>
+        <tbody>
+          ${Object.entries(porCategoria).map(([cat, val]) => {
+            const pct = totalCustos > 0 ? ((val / totalCustos) * 100).toFixed(1) : 0;
+            return `<tr>
+              <td style="padding:8px;">${cat}</td>
+              <td style="padding:8px; text-align:right;">${formatarMoeda(val)}</td>
+              <td style="padding:8px; text-align:right;">${pct}%</td>
+              <td style="padding:8px; text-align:right;">${formatarMoeda(avesMedia > 0 ? val / avesMedia : 0)}</td>
+              <td style="padding:8px; text-align:right;">${formatarMoeda(totalOvos > 0 ? val / totalOvos : 0)}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:var(--verde-bg); font-weight:bold;">
+            <td style="padding:8px;">TOTAL</td>
+            <td style="padding:8px; text-align:right;">${formatarMoeda(totalCustos)}</td>
+            <td style="padding:8px; text-align:right;">100%</td>
+            <td style="padding:8px; text-align:right;">${formatarMoeda(custoPorAve)}</td>
+            <td style="padding:8px; text-align:right;">${formatarMoeda(custoPorOvo)}</td>
+          </tr>
+        </tbody>
+       </table>
+      
+      <hr style="margin:20px 0;">
+      
+      <div class="grid-2">
+        <div>
+          <h3>🌾 Consumo no Período</h3>
+          <table style="width:100%; margin-top:8px;">
+            <tr><td style="padding:4px;">Ração total:</td><td style="text-align:right;">${totalRacaoKg.toFixed(1)} kg</td></tr>
+            <tr><td style="padding:4px;">Custo com ração:</td><td style="text-align:right;">${formatarMoeda(totalRacaoCusto)}</td></tr>
+            <tr><td style="padding:4px;">Água total:</td><td style="text-align:right;">${totalAguaL.toFixed(1)} L</td></tr>
+            <tr><td style="padding:4px;">Custo com água:</td><td style="text-align:right;">${formatarMoeda(totalAguaCusto)}</td></tr>
+            <tr><td style="padding:4px;">Custo com medicação:</td><td style="text-align:right;">${formatarMoeda(totalMedicacao)}</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>📈 Indicadores de Eficiência</h3>
+          <table style="width:100%; margin-top:8px;">
+            <tr><td style="padding:4px;">Ração por ave:</td><td style="text-align:right;">${(totalRacaoKg / avesMedia).toFixed(2)} kg</td></tr>
+            <tr><td style="padding:4px;">Ração por ovo:</td><td style="text-align:right;">${totalOvos > 0 ? (totalRacaoKg / totalOvos).toFixed(3) : 0} kg</td></tr>
+            <tr><td style="padding:4px;">Água por ave:</td><td style="text-align:right;">${(totalAguaL / avesMedia).toFixed(2)} L</td></tr>
+            <tr><td style="padding:4px;">Água por ovo:</td><td style="text-align:right;">${totalOvos > 0 ? (totalAguaL / totalOvos).toFixed(3) : 0} L</td></tr>
+            <tr><td style="padding:4px;">Ovos por ave:</td><td style="text-align:right;">${(totalOvos / avesMedia).toFixed(1)}</td></tr>
+          </table>
+        </div>
+      </div>
+      
+      <hr style="margin:20px 0;">
+      <p style="font-size:11px; color:var(--cinza-4);">Relatório gerado em ${new Date().toLocaleString('pt-BR')}</p>
+      <button class="btn btn-secondary" onclick="window.print()" style="margin-top:16px;"><i class="fa fa-print"></i> Imprimir</button>
+    </div>
+  `;
+  
+  document.getElementById('relatorio-resultado').style.display = 'block';
+  document.getElementById('relatorio-resultado').innerHTML = html;
+}
+
+// ============================================
+// USUÁRIOS
+// ============================================
+
+function renderUsuarios(container) {
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">👤 Cadastrar Usuário</div>
+        <div class="card-body">
+          <div class="form-group"><label>Nome</label><input type="text" id="user-nome" placeholder="Nome completo"></div>
+          <div class="form-group"><label>E-mail</label><input type="email" id="user-email" placeholder="email@exemplo.com"></div>
+          <div class="form-group"><label>Senha</label><input type="password" id="user-senha" placeholder="Mínimo 6 caracteres"></div>
+          <div class="form-group"><label>Função</label><select id="user-funcao"><option value="colaborador">Colaborador</option><option value="gerente">Gerente</option><option value="diretor">Diretor</option></select></div>
+          <button class="btn btn-primary" onclick="salvarUsuario()"><i class="fa fa-user-plus"></i> Cadastrar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Usuários Cadastrados</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Ações</th></tr></thead>
+            <tbody id="usuarios-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('usuarios-tbody').innerHTML = dados.usuarios.map(u => `
+    <tr>
+      <td>${u.nome}</td>
+      <td>${u.email}</td>
+      <td><span class="badge ${u.funcao === 'diretor' ? 'badge-vermelho' : u.funcao === 'gerente' ? 'badge-amarelo' : 'badge-verde'}">${u.funcao}</span></td>
+      <td><button class="btn-danger btn-sm" onclick="excluirUsuario('${u.id}')" ${u.id === usuarioAtual?.id ? 'disabled' : ''}><i class="fa fa-trash"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+function salvarUsuario() {
+  const nome = document.getElementById('user-nome').value.trim();
+  const email = document.getElementById('user-email').value.trim();
+  const senha = document.getElementById('user-senha').value;
+  const funcao = document.getElementById('user-funcao').value;
+  
+  if (!nome || !email || !senha) {
+    mostrarNotificacao('Preencha todos os campos', 'error');
+    return;
+  }
+  if (senha.length < 6) {
+    mostrarNotificacao('Senha deve ter no mínimo 6 caracteres', 'error');
+    return;
+  }
+  if (dados.usuarios.find(u => u.email === email)) {
+    mostrarNotificacao('E-mail já cadastrado', 'error');
+    return;
+  }
+  
+  dados.usuarios.push({
+    id: Date.now().toString(),
+    nome,
+    email,
+    senha,
+    funcao
+  });
+  salvarDados();
+  mostrarNotificacao('Usuário cadastrado com sucesso!');
+  mudarPagina('usuarios');
+}
+
+function excluirUsuario(id) {
+  if (id === usuarioAtual?.id) {
+    mostrarNotificacao('Não é possível excluir seu próprio usuário', 'error');
+    return;
+  }
+  dados.usuarios = dados.usuarios.filter(u => u.id !== id);
+  salvarDados();
+  mostrarNotificacao('Usuário excluído');
+  mudarPagina('usuarios');
+}
+
+// ============================================
+// LOTES
+// ============================================
+
+function renderLotes(container) {
+  container.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">📦 Cadastrar Lote</div>
+        <div class="card-body">
+          <div class="form-group"><label>Nome do Lote</label><input type="text" id="lote-nome" placeholder="Ex: Lote A"></div>
+          <div class="form-group"><label>Raça/Linhagem</label><input type="text" id="lote-raca" placeholder="Ex: ISA Brown"></div>
+          <button class="btn btn-primary" onclick="salvarLote()"><i class="fa fa-save"></i> Cadastrar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Lotes Cadastrados</div>
+        <div class="card-body" style="padding:0;">
+          <table class="data-table">
+            <thead><tr><th>Nome</th><th>Raça</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="lotes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('lotes-tbody').innerHTML = dados.lotes.map(l => `
+    <tr>
+      <td><strong>${l.nome}</strong></td>
+      <td>${l.raca || '—'}</td>
+      <td><span class="badge ${l.ativo ? 'badge-verde' : 'badge-vermelho'}">${l.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td><button class="btn-sm ${!l.ativo ? 'btn-primary' : 'btn-secondary'}" onclick="ativarLote('${l.id}')">${!l.ativo ? 'Ativar' : 'Selecionar'}</button></td>
+    </tr>
+  `).join('');
+}
+
+function salvarLote() {
+  const nome = document.getElementById('lote-nome').value.trim();
+  const raca = document.getElementById('lote-raca').value.trim();
+  
+  if (!nome) {
+    mostrarNotificacao('Informe o nome do lote', 'error');
+    return;
+  }
+  
+  dados.lotes.push({
+    id: Date.now().toString(),
+    nome,
+    raca,
+    ativo: dados.lotes.length === 0
+  });
+  salvarDados();
+  mostrarNotificacao('Lote cadastrado!');
+  mudarPagina('lotes');
+}
+
+function ativarLote(id) {
+  dados.lotes.forEach(l => l.ativo = (l.id === id));
+  salvarDados();
+  mostrarNotificacao('Lote ativado!');
+  mudarPagina('lotes');
+}
+
+// ============================================
+// INICIALIZAÇÃO
+// ============================================
+
+carregarDados();
+
+const sessao = localStorage.getItem('ovonorte_session');
+if (sessao) {
+  const data = JSON.parse(sessao);
+  const usuario = dados.usuarios.find(u => u.id === data.id);
+  if (usuario) {
+    usuarioAtual = usuario;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    document.getElementById('user-avatar').textContent = usuario.nome.substring(0, 2).toUpperCase();
+    document.getElementById('user-name').textContent = usuario.nome;
+    document.getElementById('user-role').textContent = usuario.funcao === 'diretor' ? 'Diretor' : usuario.funcao === 'gerente' ? 'Gerente' : 'Colaborador';
+    if (usuario.funcao === 'diretor' || usuario.funcao === 'gerente') {
+      document.getElementById('admin-section').style.display = 'block';
+    }
+    mudarPagina('dashboard');
+  }
+}
+
+// Adicionar event listeners para navegação
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const page = item.dataset.page;
+    if (page) mudarPagina(page);
+  });
+});
+</script>
+</body>
+</html>
