@@ -400,6 +400,28 @@ const db = firebase.firestore();
 // ============================================
 
 let usuarioAtual = null;
+let perfilUsuarioAtual = null;
+
+const COLECOES_OPERACIONAIS_PADRAO = [
+  'aves',
+  'ovos',
+  'racoes',
+  'medicacoes',
+  'mortalidades',
+  'custos',
+  'vendas',
+  'revendas',
+  'historicoVendas',
+  'historicoRevendas',
+  'historico_vendas',
+  'historico_revendas',
+  'clientes',
+  'fornecedores',
+  'produtos',
+  'estoques',
+  'estoque',
+  'lotes'
+];
 
 // ============================================
 // FUNÇÕES AUXILIARES
@@ -424,7 +446,10 @@ function notificar(msg, tipo = 'info') {
 }
 
 function hojeISO() {
-  return hojeISO();
+  // Data local no formato YYYY-MM-DD, evitando deslocamento por UTC.
+  const agora = new Date();
+  const local = new Date(agora.getTime() - agora.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 function escapeHtml(valor) {
@@ -593,83 +618,117 @@ async function getTotalCustos() {
 
 async function carregarDados(colecao) {
   try {
-    if (!usuarioAtual) return [];
-
-    // Primeiro tenta a consulta ordenada no Firestore.
-    // Se faltar índice composto, faz fallback e ordena no navegador.
-    let snapshot;
-    try {
-      snapshot = await db.collection(colecao)
-        .where('usuarioId', '==', usuarioAtual.uid)
-        .orderBy('data', 'desc')
-        .get();
-    } catch (erroIndice) {
-      console.warn(`Consulta ordenada de ${colecao} falhou; usando ordenação local.`, erroIndice);
-      snapshot = await db.collection(colecao)
-        .where('usuarioId', '==', usuarioAtual.uid)
-        .get();
-    }
+    const snapshot = await db.collection(colecao)
+      .where('usuarioId', '==', usuarioAtual.uid)
+      .orderBy('data', 'desc')
+      .get();
 
     const lista = [];
     snapshot.forEach(doc => {
       lista.push({ id: doc.id, ...doc.data() });
     });
-
-    lista.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
     atualizarStatusFirebase(true);
     return lista;
   } catch (e) {
-    console.error(`Erro ao carregar ${colecao}:`, e);
-    atualizarStatusFirebase(false, e.message);
-    notificar(`❌ Erro ao carregar ${colecao}: ${e.message}`, 'error');
-    return [];
+    console.warn(`Consulta com orderBy falhou em ${colecao}. Tentando sem ordenação.`, e);
+
+    try {
+      // Fallback: evita tela vazia quando falta índice composto no Firestore.
+      const snapshot = await db.collection(colecao)
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .get();
+
+      const lista = [];
+      snapshot.forEach(doc => {
+        lista.push({ id: doc.id, ...doc.data() });
+      });
+      lista.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+      atualizarStatusFirebase(true);
+      return lista;
+    } catch (erroFallback) {
+      console.error(`Erro ao carregar ${colecao}:`, erroFallback);
+      atualizarStatusFirebase(false, erroFallback.message);
+      return [];
+    }
   }
 }
 
 async function salvarDado(colecao, dados) {
   try {
-    if (!usuarioAtual) throw new Error('Usuário não autenticado.');
-
     dados.usuarioId = usuarioAtual.uid;
-    dados.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
-    dados.criadoEmISO = new Date().toISOString();
-
+    dados.criadoEm = new Date().toISOString();
     const ref = await db.collection(colecao).add(dados);
     atualizarStatusFirebase(true);
-    return ref.id;
+    return ref;
   } catch (e) {
     console.error(`Erro ao salvar em ${colecao}:`, e);
     atualizarStatusFirebase(false, e.message);
-    notificar(`❌ Erro ao salvar: ${e.message}`, 'error');
     return null;
   }
 }
 
-async function excluirRegistro(colecao, id, descricao = 'registro') {
-  if (!usuarioAtual || !id) return;
+function obterColecoesManutencao() {
+  const campo = document.getElementById('colecoesLimpeza');
+  const base = campo ? campo.value : COLECOES_OPERACIONAIS_PADRAO.join('\n');
 
-  const confirma = confirm(`Confirma excluir ${descricao}? Esta ação não pode ser desfeita.`);
-  if (!confirma) return;
+  return [...new Set(
+    base
+      .split(/[\n,;]+/)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .filter(item => /^[A-Za-z0-9_-]+$/.test(item))
+      .filter(item => item !== 'usuarios')
+  )];
+}
+
+async function apagarConsultaEmLotes(criarConsulta, tamanhoLote = 400) {
+  let total = 0;
+
+  while (true) {
+    const snapshot = await criarConsulta().limit(tamanhoLote).get();
+    if (snapshot.empty) break;
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+
+    total += snapshot.size;
+    if (snapshot.size < tamanhoLote) break;
+  }
+
+  return total;
+}
+
+async function excluirCustosVinculados(origemColecao, origemId) {
+  try {
+    return await apagarConsultaEmLotes(() =>
+      db.collection('custos')
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .where('origemColecao', '==', origemColecao)
+        .where('origemId', '==', origemId)
+    );
+  } catch (e) {
+    console.warn('Não foi possível remover custos vinculados:', e);
+    return 0;
+  }
+}
+
+async function excluirRegistro(colecao, id, descricao) {
+  if (!usuarioAtual || !id || !colecao) return;
+
+  const ok = confirm(`Confirma excluir este registro de ${descricao || colecao}?`);
+  if (!ok) return;
 
   try {
     await db.collection(colecao).doc(id).delete();
 
-    // Remove custos gerados automaticamente por ração/medicação quando houver vínculo.
-    if (colecao === 'racoes' || colecao === 'medicacoes') {
-      const custosVinculados = await db.collection('custos')
-        .where('usuarioId', '==', usuarioAtual.uid)
-        .where('origemColecao', '==', colecao)
-        .where('origemId', '==', id)
-        .get();
-
-      if (!custosVinculados.empty) {
-        const batch = db.batch();
-        custosVinculados.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      }
+    // Remove custos automáticos vinculados a registros novos de ração/medicação.
+    if (colecao !== 'custos') {
+      await excluirCustosVinculados(colecao, id);
     }
 
     notificar('✅ Registro excluído com sucesso!');
+    atualizarStatusFirebase(true);
     await atualizarResumoTopo();
     mostrarPagina(paginaAtual);
   } catch (e) {
@@ -679,58 +738,95 @@ async function excluirRegistro(colecao, id, descricao = 'registro') {
   }
 }
 
+async function atualizarResumoTopo() {
+  if (!usuarioAtual) return;
+
+  const aves = await getTotalAves();
+  const ovos = await getTotalOvos();
+  document.getElementById('infoAves').innerHTML = `🐔 ${aves} aves | ${ovos} ovos`;
+}
+
 async function apagarLancamentosHoje() {
   if (!usuarioAtual) return;
 
   const data = hojeISO();
-  const colecoes = ['aves', 'ovos', 'racoes', 'medicacoes', 'mortalidades', 'custos'];
-  const confirma = confirm(`Confirma apagar TODOS os lançamentos de hoje (${formatarData(data)})?\n\nSerão removidos registros de aves, ovos, ração, medicação, mortalidade e custos do usuário logado.`);
-  if (!confirma) return;
+  const confirmar = confirm(`Apagar todos os lançamentos do dia ${formatarData(data)} nas coleções operacionais?`);
+  if (!confirmar) return;
 
-  try {
-    let total = 0;
-    let batch = db.batch();
-    let operacoes = 0;
+  let total = 0;
+  const erros = [];
 
-    async function commitSeNecessario(forcar = false) {
-      if (operacoes > 0 && (forcar || operacoes >= 450)) {
-        await batch.commit();
-        batch = db.batch();
-        operacoes = 0;
-      }
+  for (const colecao of COLECOES_OPERACIONAIS_PADRAO) {
+    try {
+      total += await apagarConsultaEmLotes(() =>
+        db.collection(colecao)
+          .where('usuarioId', '==', usuarioAtual.uid)
+          .where('data', '==', data)
+      );
+    } catch (e) {
+      erros.push(`${colecao}: ${e.message}`);
     }
-
-    for (const colecao of colecoes) {
-      const snapshot = await db.collection(colecao)
-        .where('usuarioId', '==', usuarioAtual.uid)
-        .where('data', '==', data)
-        .get();
-
-      snapshot.forEach(doc => {
-        batch.delete(doc.ref);
-        operacoes++;
-        total++;
-      });
-
-      await commitSeNecessario();
-    }
-
-    await commitSeNecessario(true);
-
-    notificar(total > 0 ? `✅ ${total} lançamento(s) de hoje apagado(s).` : 'ℹ️ Nenhum lançamento de hoje encontrado.');
-    await atualizarResumoTopo();
-    mostrarPagina(paginaAtual);
-  } catch (e) {
-    console.error('Erro ao apagar lançamentos de hoje:', e);
-    atualizarStatusFirebase(false, e.message);
-    notificar(`❌ Erro ao apagar lançamentos de hoje: ${e.message}`, 'error');
   }
+
+  if (erros.length) {
+    console.warn('Falhas ao apagar lançamentos de hoje:', erros);
+    notificar(`⚠️ ${total} registro(s) apagado(s). Algumas coleções falharam.`, 'error');
+  } else {
+    notificar(`✅ ${total} lançamento(s) de hoje apagado(s).`);
+  }
+
+  await atualizarResumoTopo();
+  mostrarPagina('dashboard');
 }
 
-async function atualizarResumoTopo() {
-  const aves = await getTotalAves();
-  const ovos = await getTotalOvos();
-  document.getElementById('infoAves').innerHTML = `🐔 ${aves} aves | ${ovos} ovos`;
+async function limparBaseOperacional(apagarTudo = false) {
+  if (!usuarioAtual) return;
+
+  const colecoes = obterColecoesManutencao();
+  if (!colecoes.length) {
+    notificar('⚠️ Informe pelo menos uma coleção para limpeza.', 'error');
+    return;
+  }
+
+  const textoConfirmacao = apagarTudo ? 'ZERAR BASE' : 'LIMPAR MEUS DADOS';
+  const mensagem = apagarTudo
+    ? `ATENÇÃO: isso apagará TODOS os documentos das coleções listadas, inclusive dados de outros usuários. Digite ${textoConfirmacao} para continuar.`
+    : `Isso apagará os documentos do usuário logado nas coleções listadas. Digite ${textoConfirmacao} para continuar.`;
+
+  const digitado = prompt(mensagem);
+  if (digitado !== textoConfirmacao) {
+    notificar('Operação cancelada.');
+    return;
+  }
+
+  const resultado = [];
+  let total = 0;
+
+  for (const colecao of colecoes) {
+    try {
+      const qtd = await apagarConsultaEmLotes(() => {
+        const ref = db.collection(colecao);
+        return apagarTudo ? ref : ref.where('usuarioId', '==', usuarioAtual.uid);
+      });
+
+      total += qtd;
+      resultado.push(`✅ ${colecao}: ${qtd}`);
+    } catch (e) {
+      resultado.push(`❌ ${colecao}: ${e.message}`);
+    }
+  }
+
+  const saida = document.getElementById('resultadoLimpeza');
+  if (saida) {
+    saida.innerHTML = `
+      <strong>Resultado da limpeza:</strong><br>
+      ${resultado.map(linha => escapeHtml(linha)).join('<br>')}
+      <br><br><strong>Total apagado:</strong> ${total}
+    `;
+  }
+
+  notificar(`✅ Limpeza concluída. ${total} registro(s) apagado(s).`);
+  await atualizarResumoTopo();
 }
 
 // ============================================
@@ -740,48 +836,36 @@ async function atualizarResumoTopo() {
 async function iniciarApp() {
   await atualizarResumoTopo();
 
-  let dadosUsuario = null;
+  // Buscar dados do usuário
+  perfilUsuarioAtual = null;
   try {
-    const userDoc = await db.collection('usuarios').doc(usuarioAtual.uid).get();
-
-    if (userDoc.exists) {
-      dadosUsuario = userDoc.data();
-    } else {
-      // Garante que usuários reais do Firebase Auth tenham perfil no Firestore.
-      dadosUsuario = {
-        nome: usuarioAtual.email ? usuarioAtual.email.split('@')[0] : 'Usuário',
-        email: usuarioAtual.email || '',
-        funcao: 'colaborador',
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
-        criadoEmISO: new Date().toISOString()
-      };
-      await db.collection('usuarios').doc(usuarioAtual.uid).set(dadosUsuario);
+    const doc = await db.collection('usuarios').doc(usuarioAtual.uid).get();
+    if (doc.exists) {
+      perfilUsuarioAtual = doc.data();
     }
-
-    const usuarioEl = document.getElementById('usuarioLogado');
-    if (usuarioEl) usuarioEl.textContent = dadosUsuario.nome || usuarioAtual.email || 'Usuário';
-    atualizarStatusFirebase(true);
   } catch (e) {
-    console.error('Erro ao buscar usuário:', e);
-    atualizarStatusFirebase(false, e.message);
-    notificar(`❌ Erro ao acessar dados do Firebase: ${e.message}`, 'error');
+    console.error(e);
   }
 
+  document.getElementById('usuarioLogado').textContent =
+    perfilUsuarioAtual?.nome || usuarioAtual.email || 'Usuário';
+
   let menu = document.getElementById('menuSuperior');
-  let paginas = ['dashboard', 'aves', 'ovos', 'racao', 'medicacao', 'mortalidade', 'custos', 'custo-unitario', 'relatorios'];
-  let nomes = ['📊 Dashboard', '🐔 Aves', '🥚 Ovos', '🌾 Ração', '💊 Medicação', '⚠️ Mortalidade', '💰 Custos', '📈 Custo Unitário', '📄 Relatórios'];
+  let paginas = ['dashboard', 'aves', 'ovos', 'racao', 'medicacao', 'mortalidade', 'custos', 'custo-unitario', 'relatorios', 'manutencao'];
+  let nomes = ['📊 Dashboard', '🐔 Aves', '🥚 Ovos', '🌾 Ração', '💊 Medicação', '⚠️ Mortalidade', '💰 Custos', '📈 Custo Unitário', '📄 Relatórios', '🧹 Manutenção'];
 
   // Verificar se o usuário tem permissão de admin
-  if (dadosUsuario && dadosUsuario.funcao === 'diretor') {
+  if (perfilUsuarioAtual?.funcao === 'diretor') {
     paginas.push('usuarios');
     nomes.push('👤 Usuários');
   }
 
   menu.innerHTML = '';
   for (let i = 0; i < paginas.length; i++) {
-    menu.innerHTML += `<button onclick="mostrarPagina('${paginas[i]}', this)" data-pagina="${paginas[i]}">${nomes[i]}</button>`;
+    menu.innerHTML += `<button data-pagina="${paginas[i]}" onclick="mostrarPagina('${paginas[i]}', this)">${nomes[i]}</button>`;
   }
 
+  atualizarStatusFirebase(true);
   mostrarPagina('dashboard');
 }
 
@@ -809,7 +893,8 @@ function mostrarPagina(pagina, botao = null) {
     custos: '💰 Custos e Despesas',
     'custo-unitario': '📈 Custo Unitário',
     relatorios: '📄 Relatórios',
-    usuarios: '👤 Usuários'
+    usuarios: '👤 Usuários',
+    manutencao: '🧹 Manutenção da Base'
   };
   
   document.getElementById('tituloPagina').textContent = titulos[pagina] || 'OVONORTE';
@@ -827,6 +912,7 @@ function mostrarPagina(pagina, botao = null) {
   else if (pagina === 'custo-unitario') renderCustoUnitario(container);
   else if (pagina === 'relatorios') renderRelatorios(container);
   else if (pagina === 'usuarios') renderUsuarios(container);
+  else if (pagina === 'manutencao') renderManutencao(container);
 }
 
 // ============================================
@@ -911,6 +997,7 @@ async function renderDashboard(container) {
       </p>
       <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn-secondary" onclick="apagarLancamentosHoje()">🧹 Apagar lançamentos de hoje</button>
+        <button class="btn-danger" onclick="mostrarPagina('manutencao')">⚠️ Limpar histórico/testes</button>
       </div>
     </div>
     
@@ -979,7 +1066,6 @@ async function salvarAve() {
   const ok = await salvarDado('aves', { data, tipo, quantidade: qtd, obs });
   if (ok) {
     notificar('✅ Movimentação registrada!');
-    await atualizarResumoTopo();
     document.getElementById('aveQtd').value = '';
     document.getElementById('aveObs').value = '';
     mostrarPagina('aves');
@@ -1039,7 +1125,6 @@ async function salvarOvo() {
   const ok = await salvarDado('ovos', { data, inteiros, trincados, obs });
   if (ok) {
     notificar('✅ Coleta registrada com sucesso!');
-    await atualizarResumoTopo();
     document.getElementById('ovoInteiros').value = '0';
     document.getElementById('ovoTrincados').value = '0';
     document.getElementById('ovoObs').value = '';
@@ -1109,31 +1194,33 @@ async function salvarRacao() {
     return;
   }
 
-  const racaoId = await salvarDado('racoes', { data, tipo: raTipo, raKg, raCusto, aguaL, aguaCusto });
-  if (!racaoId) {
+  const registroRef = await salvarDado('racoes', { data, tipo: raTipo, raKg, raCusto, aguaL, aguaCusto });
+  if (!registroRef) {
     notificar('❌ Erro ao registrar', 'error');
     return;
   }
 
-  // Registrar custos separadamente com vínculo para exclusão futura.
+  // Registrar custos separadamente, vinculando à origem para exclusão futura.
   if (raCusto > 0) {
-    await salvarDado('custos', {
+    await db.collection('custos').add({
       data,
-      categoria: 'ração',
       descricao: `Ração ${raTipo} (${raKg}kg)`,
       valor: raCusto,
+      usuarioId: usuarioAtual.uid,
       origemColecao: 'racoes',
-      origemId: racaoId
+      origemId: registroRef.id,
+      criadoEm: new Date().toISOString()
     });
   }
   if (aguaCusto > 0) {
-    await salvarDado('custos', {
+    await db.collection('custos').add({
       data,
-      categoria: 'água',
       descricao: `Água (${aguaL}L)`,
       valor: aguaCusto,
+      usuarioId: usuarioAtual.uid,
       origemColecao: 'racoes',
-      origemId: racaoId
+      origemId: registroRef.id,
+      criadoEm: new Date().toISOString()
     });
   }
 
@@ -1142,7 +1229,6 @@ async function salvarRacao() {
   document.getElementById('raCusto').value = '0';
   document.getElementById('aguaL').value = '0';
   document.getElementById('aguaCusto').value = '0';
-  await atualizarResumoTopo();
   mostrarPagina('racao');
 }
 
@@ -1197,20 +1283,21 @@ async function salvarMedicacao() {
     return;
   }
 
-  const medicacaoId = await salvarDado('medicacoes', { data, produto, finalidade, custo, aves, obs });
-  if (!medicacaoId) {
+  const registroRef = await salvarDado('medicacoes', { data, produto, finalidade, custo, aves, obs });
+  if (!registroRef) {
     notificar('❌ Erro ao registrar', 'error');
     return;
   }
 
   if (custo > 0) {
-    await salvarDado('custos', {
+    await db.collection('custos').add({
       data,
-      categoria: 'medicamento',
       descricao: `Medicação: ${produto}`,
       valor: custo,
+      usuarioId: usuarioAtual.uid,
       origemColecao: 'medicacoes',
-      origemId: medicacaoId
+      origemId: registroRef.id,
+      criadoEm: new Date().toISOString()
     });
   }
 
@@ -1218,7 +1305,6 @@ async function salvarMedicacao() {
   document.getElementById('medProduto').value = '';
   document.getElementById('medCusto').value = '';
   document.getElementById('medObs').value = '';
-  await atualizarResumoTopo();
   mostrarPagina('medicacao');
 }
 
@@ -1281,7 +1367,6 @@ async function salvarMortalidade() {
   const ok = await salvarDado('mortalidades', { data, qtd, causa, obs });
   if (ok) {
     notificar('✅ Mortalidade registrada');
-    await atualizarResumoTopo();
     document.getElementById('mortQtd').value = '';
     document.getElementById('mortObs').value = '';
     mostrarPagina('mortalidade');
@@ -1343,7 +1428,6 @@ async function salvarCusto() {
   const ok = await salvarDado('custos', { data, categoria: cat, descricao: desc, valor, fornecedor });
   if (ok) {
     notificar('✅ Custo registrado com sucesso!');
-    await atualizarResumoTopo();
     document.getElementById('custoDesc').value = '';
     document.getElementById('custoValor').value = '';
     document.getElementById('custoFornecedor').value = '';
@@ -1410,6 +1494,50 @@ async function renderRelatorios(container) {
 }
 
 // ============================================
+// MANUTENÇÃO DA BASE
+// ============================================
+
+async function renderManutencao(container) {
+  const colecoesPadrao = COLECOES_OPERACIONAIS_PADRAO.join('\n');
+
+  container.innerHTML = `
+    <div class="card">
+      <h3>🧹 Limpeza de dados de teste e históricos</h3>
+      <p>
+        Use esta área para apagar dados fictícios gerados durante o desenvolvimento, incluindo históricos de vendas/revendas,
+        produção, custos, aves, ração, medicações e mortalidade.
+      </p>
+      <p style="margin-top:10px; color:#a93226;">
+        <strong>Atenção:</strong> esta rotina não apaga o login do Firebase Auth e não inclui a coleção <code>usuarios</code> por padrão,
+        para você não perder acesso ao sistema.
+      </p>
+
+      <div class="campo" style="margin-top:16px;">
+        <label>Coleções que serão limpas</label>
+        <textarea id="colecoesLimpeza" rows="10">${colecoesPadrao}</textarea>
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="limparBaseOperacional(false)">🧹 Limpar dados do usuário logado</button>
+        <button class="btn-danger" onclick="limparBaseOperacional(true)">⚠️ Zerar completamente as coleções listadas</button>
+      </div>
+
+      <div style="margin-top:16px; background:#fff8e1; padding:14px; border-radius:8px;">
+        <p><strong>Quando usar cada opção:</strong></p>
+        <p>• <strong>Limpar dados do usuário logado:</strong> apaga documentos com <code>usuarioId</code> igual ao usuário atual.</p>
+        <p>• <strong>Zerar completamente:</strong> apaga todos os documentos das coleções listadas. Use para remover dados antigos de teste sem <code>usuarioId</code>.</p>
+        <p>• Se “histórico de revendas” estiver em outra coleção, adicione o nome exato da coleção na lista acima.</p>
+      </div>
+
+      <div id="resultadoLimpeza" style="margin-top:16px; background:var(--verde-bg); padding:14px; border-radius:8px; display:block;">
+        Nenhuma limpeza executada nesta sessão.
+      </div>
+    </div>
+  `;
+}
+
+
+// ============================================
 // USUÁRIOS (APENAS ADMIN)
 // ============================================
 
@@ -1444,7 +1572,7 @@ async function renderUsuarios(container) {
             <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th></tr></thead>
             <tbody>
               ${usuarios.length === 0 ? '<tr><td colspan="3" style="text-align:center; color:#888;">Nenhum usuário</td></tr>' :
-              usuarios.map(u => `<tr><td><strong>${escapeHtml(u.nome) || '—'}</strong></td><td>${escapeHtml(u.email)}</td><td>${u.funcao === 'diretor' ? '👑 Diretor' : '👤 Colaborador'}</td></tr>`).join('')}
+              usuarios.map(u => `<tr><td><strong>${u.nome || '—'}</strong></td><td>${u.email}</td><td>${u.funcao === 'diretor' ? '👑 Diretor' : '👤 Colaborador'}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
