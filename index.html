@@ -403,24 +403,146 @@ let usuarioAtual = null;
 let perfilUsuarioAtual = null;
 
 const COLECOES_OPERACIONAIS_PADRAO = [
+  // Coleções usadas diretamente por este sistema
   'aves',
   'ovos',
   'racoes',
   'medicacoes',
   'mortalidades',
   'custos',
+
+  // Possíveis coleções antigas/de teste usadas em versões anteriores
+  'custo',
+  'despesas',
+  'despesa',
   'vendas',
+  'venda',
   'revendas',
+  'revenda',
   'historicoVendas',
-  'historicoRevendas',
+  'historicoVenda',
+  'historicosVendas',
   'historico_vendas',
+  'historico_venda',
+  'historicos_vendas',
+  'historicoRevendas',
+  'historicoRevenda',
+  'historicosRevendas',
   'historico_revendas',
+  'historico_revenda',
+  'historicos_revendas',
+  'historicoDeRevendas',
+  'historico_de_revendas',
+  'revendasHistorico',
+  'revendaHistorico',
+  'historico',
+  'historicos',
+  'historicoCustos',
+  'historico_custos',
+
+  // Cadastros operacionais que podem ter sido populados com teste
   'clientes',
+  'cliente',
   'fornecedores',
+  'fornecedor',
   'produtos',
+  'produto',
   'estoques',
   'estoque',
-  'lotes'
+  'lotes',
+  'lote',
+  'producoes',
+  'producao',
+  'coletas',
+  'coleta',
+  'coletaOvos',
+  'coletasOvos',
+  'estoqueOvos',
+
+  // Variações com inicial maiúscula, pois coleção do Firestore diferencia maiúsculas/minúsculas
+  'Custos',
+  'Custo',
+  'Despesas',
+  'Vendas',
+  'Venda',
+  'Revendas',
+  'Revenda',
+  'HistoricoRevendas',
+  'HistoricoRevenda',
+  'HistoricosRevendas',
+  'HistoricoVendas',
+  'HistoricoCustos'
+];
+
+const COLECOES_LIMPEZA_CRITICA = [
+  'custos',
+  'custo',
+  'despesas',
+  'despesa',
+  'historicoCustos',
+  'historico_custos',
+  'vendas',
+  'venda',
+  'revendas',
+  'revenda',
+  'historicoVendas',
+  'historicoVenda',
+  'historicosVendas',
+  'historico_vendas',
+  'historico_venda',
+  'historicos_vendas',
+  'historicoRevendas',
+  'historicoRevenda',
+  'historicosRevendas',
+  'historico_revendas',
+  'historico_revenda',
+  'historicos_revendas',
+  'historicoDeRevendas',
+  'historico_de_revendas',
+  'revendasHistorico',
+  'revendaHistorico',
+  'historico',
+  'historicos',
+  'Custos',
+  'Custo',
+  'Despesas',
+  'Vendas',
+  'Venda',
+  'Revendas',
+  'Revenda',
+  'HistoricoRevendas',
+  'HistoricoRevenda',
+  'HistoricosRevendas',
+  'HistoricoVendas',
+  'HistoricoCustos'
+];
+
+const CAMPOS_DONO_DOCUMENTO = [
+  'usuarioId',
+  'userId',
+  'uid',
+  'idUsuario',
+  'usuario_id',
+  'usuarioUID',
+  'usuarioUid',
+  'usuario',
+  'ownerId',
+  'createdBy',
+  'criadoPor',
+  'responsavelId',
+  'emailUsuario',
+  'userEmail',
+  'email'
+];
+
+const CAMPOS_DATA_DOCUMENTO = [
+  'data',
+  'dt',
+  'dataLancamento',
+  'data_lancamento',
+  'createdAt',
+  'criadoEm',
+  'created_at'
 ];
 
 // ============================================
@@ -681,6 +803,27 @@ function obterColecoesManutencao() {
   )];
 }
 
+function valoresPossiveisUsuarioAtual() {
+  if (!usuarioAtual) return [];
+  return [...new Set([
+    usuarioAtual.uid,
+    usuarioAtual.email,
+    perfilUsuarioAtual?.email,
+    perfilUsuarioAtual?.nome,
+    perfilUsuarioAtual?.id,
+    perfilUsuarioAtual?.uid
+  ].filter(Boolean))];
+}
+
+async function apagarSnapshotEmLote(snapshot) {
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
+  return snapshot.size;
+}
+
 async function apagarConsultaEmLotes(criarConsulta, tamanhoLote = 400) {
   let total = 0;
 
@@ -688,25 +831,106 @@ async function apagarConsultaEmLotes(criarConsulta, tamanhoLote = 400) {
     const snapshot = await criarConsulta().limit(tamanhoLote).get();
     if (snapshot.empty) break;
 
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
-
-    total += snapshot.size;
+    total += await apagarSnapshotEmLote(snapshot);
     if (snapshot.size < tamanhoLote) break;
   }
 
   return total;
 }
 
+async function contarConsultaSegura(criarConsulta, tamanhoLote = 500) {
+  const snapshot = await criarConsulta().limit(tamanhoLote).get();
+  return snapshot.size;
+}
+
+async function apagarColecaoPorUsuario(colecao) {
+  let total = 0;
+  const erros = [];
+  const valoresUsuario = valoresPossiveisUsuarioAtual();
+
+  for (const campo of CAMPOS_DONO_DOCUMENTO) {
+    for (const valor of valoresUsuario) {
+      try {
+        total += await apagarConsultaEmLotes(() =>
+          db.collection(colecao).where(campo, '==', valor)
+        );
+      } catch (e) {
+        // Ignora erros de campo/regra nesta varredura para continuar testando outras possibilidades.
+        erros.push(`${campo}: ${e.message}`);
+      }
+    }
+  }
+
+  return { total, erros };
+}
+
+async function apagarColecaoInteira(colecao) {
+  return apagarConsultaEmLotes(() => db.collection(colecao));
+}
+
+async function apagarGrupoDeSubcolecao(colecao) {
+  if (typeof db.collectionGroup !== 'function') return 0;
+  return apagarConsultaEmLotes(() => db.collectionGroup(colecao));
+}
+
+async function apagarColecaoPorDataHoje(colecao, dataISO) {
+  let total = 0;
+  const erros = [];
+  const valoresUsuario = valoresPossiveisUsuarioAtual();
+
+  for (const campoData of CAMPOS_DATA_DOCUMENTO) {
+    try {
+      total += await apagarConsultaEmLotes(() =>
+        db.collection(colecao).where(campoData, '==', dataISO)
+      );
+    } catch (e) {
+      erros.push(`${campoData}: ${e.message}`);
+    }
+
+    for (const campoDono of CAMPOS_DONO_DOCUMENTO) {
+      for (const valorUsuario of valoresUsuario) {
+        try {
+          total += await apagarConsultaEmLotes(() =>
+            db.collection(colecao)
+              .where(campoData, '==', dataISO)
+              .where(campoDono, '==', valorUsuario)
+          );
+        } catch (e) {
+          erros.push(`${campoData}+${campoDono}: ${e.message}`);
+        }
+      }
+    }
+  }
+
+  return { total, erros };
+}
+
 async function excluirCustosVinculados(origemColecao, origemId) {
   try {
-    return await apagarConsultaEmLotes(() =>
+    let total = 0;
+
+    // Custos novos gravados pela versão corrigida.
+    total += await apagarConsultaEmLotes(() =>
       db.collection('custos')
         .where('usuarioId', '==', usuarioAtual.uid)
         .where('origemColecao', '==', origemColecao)
         .where('origemId', '==', origemId)
     );
+
+    // Custos antigos podem ter sido gravados sem usuarioId.
+    total += await apagarConsultaEmLotes(() =>
+      db.collection('custos')
+        .where('origemColecao', '==', origemColecao)
+        .where('origemId', '==', origemId)
+    );
+
+    total += await apagarConsultaEmLotes(() =>
+      db.collection('custos')
+        .where('referenciaColecao', '==', origemColecao)
+        .where('referenciaId', '==', origemId)
+    );
+
+    return total;
   } catch (e) {
     console.warn('Não foi possível remover custos vinculados:', e);
     return 0;
@@ -722,7 +946,7 @@ async function excluirRegistro(colecao, id, descricao) {
   try {
     await db.collection(colecao).doc(id).delete();
 
-    // Remove custos automáticos vinculados a registros novos de ração/medicação.
+    // Remove custos automáticos vinculados a registros novos e antigos.
     if (colecao !== 'custos') {
       await excluirCustosVinculados(colecao, id);
     }
@@ -754,27 +978,28 @@ async function apagarLancamentosHoje() {
   if (!confirmar) return;
 
   let total = 0;
-  const erros = [];
+  const resultado = [];
 
   for (const colecao of COLECOES_OPERACIONAIS_PADRAO) {
     try {
-      total += await apagarConsultaEmLotes(() =>
-        db.collection(colecao)
-          .where('usuarioId', '==', usuarioAtual.uid)
-          .where('data', '==', data)
-      );
+      const r = await apagarColecaoPorDataHoje(colecao, data);
+      total += r.total;
+      resultado.push(`✅ ${colecao}: ${r.total}`);
     } catch (e) {
-      erros.push(`${colecao}: ${e.message}`);
+      resultado.push(`❌ ${colecao}: ${e.message}`);
     }
   }
 
-  if (erros.length) {
-    console.warn('Falhas ao apagar lançamentos de hoje:', erros);
-    notificar(`⚠️ ${total} registro(s) apagado(s). Algumas coleções falharam.`, 'error');
-  } else {
-    notificar(`✅ ${total} lançamento(s) de hoje apagado(s).`);
+  const saida = document.getElementById('resultadoLimpeza');
+  if (saida) {
+    saida.innerHTML = `
+      <strong>Resultado da limpeza de hoje:</strong><br>
+      ${resultado.map(linha => escapeHtml(linha)).join('<br>')}
+      <br><br><strong>Total apagado:</strong> ${total}
+    `;
   }
 
+  notificar(`✅ ${total} lançamento(s) de hoje apagado(s).`);
   await atualizarResumoTopo();
   mostrarPagina('dashboard');
 }
@@ -790,8 +1015,8 @@ async function limparBaseOperacional(apagarTudo = false) {
 
   const textoConfirmacao = apagarTudo ? 'ZERAR BASE' : 'LIMPAR MEUS DADOS';
   const mensagem = apagarTudo
-    ? `ATENÇÃO: isso apagará TODOS os documentos das coleções listadas, inclusive dados de outros usuários. Digite ${textoConfirmacao} para continuar.`
-    : `Isso apagará os documentos do usuário logado nas coleções listadas. Digite ${textoConfirmacao} para continuar.`;
+    ? `ATENÇÃO: isso apagará TODOS os documentos das coleções listadas e tentará também subcoleções com esses nomes. Digite ${textoConfirmacao} para continuar.`
+    : `Isso tentará apagar documentos do usuário logado usando vários campos possíveis: usuarioId, userId, uid, email etc. Digite ${textoConfirmacao} para continuar.`;
 
   const digitado = prompt(mensagem);
   if (digitado !== textoConfirmacao) {
@@ -804,10 +1029,15 @@ async function limparBaseOperacional(apagarTudo = false) {
 
   for (const colecao of colecoes) {
     try {
-      const qtd = await apagarConsultaEmLotes(() => {
-        const ref = db.collection(colecao);
-        return apagarTudo ? ref : ref.where('usuarioId', '==', usuarioAtual.uid);
-      });
+      let qtd = 0;
+
+      if (apagarTudo) {
+        qtd += await apagarColecaoInteira(colecao);
+        qtd += await apagarGrupoDeSubcolecao(colecao);
+      } else {
+        const r = await apagarColecaoPorUsuario(colecao);
+        qtd += r.total;
+      }
 
       total += qtd;
       resultado.push(`✅ ${colecao}: ${qtd}`);
@@ -822,11 +1052,97 @@ async function limparBaseOperacional(apagarTudo = false) {
       <strong>Resultado da limpeza:</strong><br>
       ${resultado.map(linha => escapeHtml(linha)).join('<br>')}
       <br><br><strong>Total apagado:</strong> ${total}
+      <br><br>
+      <small>
+        Se uma coleção aparecer com erro de permissão, a regra do Firestore está bloqueando exclusão desses documentos pelo usuário atual.
+        Nesse caso, use uma conta administradora ou apague pela Console do Firebase.
+      </small>
     `;
   }
 
   notificar(`✅ Limpeza concluída. ${total} registro(s) apagado(s).`);
   await atualizarResumoTopo();
+}
+
+async function limparHistoricosRevendasCustos() {
+  if (!usuarioAtual) return;
+
+  const confirmar = prompt(
+    'Esta rotina apaga especialmente custos, vendas, revendas e históricos em várias variações de nome. Digite APAGAR TESTES para continuar.'
+  );
+
+  if (confirmar !== 'APAGAR TESTES') {
+    notificar('Operação cancelada.');
+    return;
+  }
+
+  const resultado = [];
+  let total = 0;
+
+  for (const colecao of COLECOES_LIMPEZA_CRITICA) {
+    try {
+      let qtd = 0;
+
+      // Primeiro tenta apagar tudo, para alcançar dados de teste sem usuarioId.
+      try {
+        qtd += await apagarColecaoInteira(colecao);
+      } catch (e) {
+        // Se a regra bloquear apagar tudo, tenta pelos campos de usuário.
+        const parcial = await apagarColecaoPorUsuario(colecao);
+        qtd += parcial.total;
+      }
+
+      // Também tenta subcoleções com os mesmos nomes.
+      try {
+        qtd += await apagarGrupoDeSubcolecao(colecao);
+      } catch (e) {
+        // Subcoleção bloqueada ou inexistente: segue para a próxima.
+      }
+
+      total += qtd;
+      resultado.push(`✅ ${colecao}: ${qtd}`);
+    } catch (e) {
+      resultado.push(`❌ ${colecao}: ${e.message}`);
+    }
+  }
+
+  const saida = document.getElementById('resultadoLimpeza');
+  if (saida) {
+    saida.innerHTML = `
+      <strong>Resultado da limpeza crítica:</strong><br>
+      ${resultado.map(linha => escapeHtml(linha)).join('<br>')}
+      <br><br><strong>Total apagado:</strong> ${total}
+    `;
+  }
+
+  notificar(`✅ Limpeza crítica concluída. ${total} registro(s) apagado(s).`);
+  await atualizarResumoTopo();
+}
+
+async function diagnosticarColecoes() {
+  if (!usuarioAtual) return;
+
+  const colecoes = obterColecoesManutencao();
+  const resultado = [];
+
+  for (const colecao of colecoes) {
+    try {
+      const qtd = await contarConsultaSegura(() => db.collection(colecao));
+      resultado.push(`📁 ${colecao}: ${qtd} documento(s) visível(is)`);
+    } catch (e) {
+      resultado.push(`⚠️ ${colecao}: ${e.message}`);
+    }
+  }
+
+  const saida = document.getElementById('resultadoLimpeza');
+  if (saida) {
+    saida.innerHTML = `
+      <strong>Diagnóstico das coleções listadas:</strong><br>
+      ${resultado.map(linha => escapeHtml(linha)).join('<br>')}
+      <br><br>
+      <small>O diagnóstico só mostra documentos que as regras do Firestore permitem ler com o usuário atual.</small>
+    `;
+  }
 }
 
 // ============================================
@@ -1514,28 +1830,31 @@ async function renderManutencao(container) {
 
       <div class="campo" style="margin-top:16px;">
         <label>Coleções que serão limpas</label>
-        <textarea id="colecoesLimpeza" rows="10">${colecoesPadrao}</textarea>
+        <textarea id="colecoesLimpeza" rows="14">${colecoesPadrao}</textarea>
       </div>
 
       <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="diagnosticarColecoes()">🔎 Diagnosticar coleções visíveis</button>
         <button class="btn-secondary" onclick="limparBaseOperacional(false)">🧹 Limpar dados do usuário logado</button>
+        <button class="btn-danger" onclick="limparHistoricosRevendasCustos()">🔥 Apagar históricos/revendas/custos de teste</button>
         <button class="btn-danger" onclick="limparBaseOperacional(true)">⚠️ Zerar completamente as coleções listadas</button>
       </div>
 
       <div style="margin-top:16px; background:#fff8e1; padding:14px; border-radius:8px;">
         <p><strong>Quando usar cada opção:</strong></p>
-        <p>• <strong>Limpar dados do usuário logado:</strong> apaga documentos com <code>usuarioId</code> igual ao usuário atual.</p>
-        <p>• <strong>Zerar completamente:</strong> apaga todos os documentos das coleções listadas. Use para remover dados antigos de teste sem <code>usuarioId</code>.</p>
-        <p>• Se “histórico de revendas” estiver em outra coleção, adicione o nome exato da coleção na lista acima.</p>
+        <p>• <strong>Diagnosticar:</strong> mostra quantos documentos o usuário logado consegue ler em cada coleção listada.</p>
+        <p>• <strong>Limpar dados do usuário logado:</strong> tenta apagar por <code>usuarioId</code>, <code>userId</code>, <code>uid</code>, <code>email</code> e outros campos comuns.</p>
+        <p>• <strong>Apagar históricos/revendas/custos:</strong> rotina específica para dados antigos de teste, inclusive documentos sem <code>usuarioId</code>, se a regra permitir.</p>
+        <p>• <strong>Zerar completamente:</strong> apaga todos os documentos das coleções listadas e também tenta subcoleções com esses nomes.</p>
+        <p>• Se ainda sobrar dado, copie exatamente o nome da coleção no Firebase Console e acrescente na lista acima. O Firestore diferencia maiúsculas/minúsculas.</p>
       </div>
 
-      <div id="resultadoLimpeza" style="margin-top:16px; background:var(--verde-bg); padding:14px; border-radius:8px; display:block;">
+      <div id="resultadoLimpeza" style="margin-top:16px; background:var(--verde-bg); padding:14px; border-radius:8px; display:block; max-height:420px; overflow:auto;">
         Nenhuma limpeza executada nesta sessão.
       </div>
     </div>
   `;
 }
-
 
 // ============================================
 // USUÁRIOS (APENAS ADMIN)
