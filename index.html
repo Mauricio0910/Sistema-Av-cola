@@ -205,6 +205,30 @@ body {
   background: #a93226;
 }
 
+.btn-secondary {
+  background: #555;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-secondary:hover {
+  background: #333;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: 12px;
+  margin: 2px;
+}
+
+.acoes {
+  white-space: nowrap;
+}
+
 /* KPIs */
 .kpis {
   display: grid;
@@ -338,8 +362,10 @@ th, td {
       <h2 id="tituloPagina">OVONORTE</h2>
       <div class="badge" id="infoAves">Carregando...</div>
     </div>
-    <div>
-      <button onclick="fazerLogout()" style="background:#555; padding:8px 16px;">Sair</button>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+      <span class="badge" id="firebaseStatus">Firebase: verificando...</span>
+      <span class="badge" id="usuarioLogado"></span>
+      <button onclick="fazerLogout()" style="background:#555; color:white; border:none; border-radius:8px; padding:8px 16px; cursor:pointer;">Sair</button>
     </div>
   </div>
   
@@ -389,11 +415,44 @@ function formatarData(d) {
   return `${p[2]}/${p[1]}/${p[0]}`;
 }
 
-function notificar(msg) {
+function notificar(msg, tipo = 'info') {
   let n = document.getElementById('notificacao');
   n.textContent = msg;
   n.style.display = 'block';
+  n.style.borderLeft = tipo === 'error' ? '4px solid var(--vermelho)' : '4px solid var(--verde)';
   setTimeout(() => n.style.display = 'none', 4000);
+}
+
+function hojeISO() {
+  return hojeISO();
+}
+
+function escapeHtml(valor) {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeJs(valor) {
+  return String(valor ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, ' ');
+}
+
+function botaoExcluir(colecao, id, descricao) {
+  return `<button class="btn-danger btn-small" onclick="excluirRegistro('${colecao}', '${escapeJs(id)}', '${escapeJs(descricao)}')">🗑️ Excluir</button>`;
+}
+
+function atualizarStatusFirebase(ok, detalhe = '') {
+  const el = document.getElementById('firebaseStatus');
+  if (!el) return;
+  el.textContent = ok ? 'Firebase: conectado' : 'Firebase: erro';
+  el.style.background = ok ? 'var(--verde-bg)' : '#fde8e6';
+  el.title = detalhe || '';
 }
 
 // ============================================
@@ -534,32 +593,144 @@ async function getTotalCustos() {
 
 async function carregarDados(colecao) {
   try {
-    const snapshot = await db.collection(colecao)
-      .where('usuarioId', '==', usuarioAtual.uid)
-      .orderBy('data', 'desc')
-      .get();
-    
+    if (!usuarioAtual) return [];
+
+    // Primeiro tenta a consulta ordenada no Firestore.
+    // Se faltar índice composto, faz fallback e ordena no navegador.
+    let snapshot;
+    try {
+      snapshot = await db.collection(colecao)
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .orderBy('data', 'desc')
+        .get();
+    } catch (erroIndice) {
+      console.warn(`Consulta ordenada de ${colecao} falhou; usando ordenação local.`, erroIndice);
+      snapshot = await db.collection(colecao)
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .get();
+    }
+
     const lista = [];
     snapshot.forEach(doc => {
       lista.push({ id: doc.id, ...doc.data() });
     });
+
+    lista.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+    atualizarStatusFirebase(true);
     return lista;
   } catch (e) {
-    console.error(e);
+    console.error(`Erro ao carregar ${colecao}:`, e);
+    atualizarStatusFirebase(false, e.message);
+    notificar(`❌ Erro ao carregar ${colecao}: ${e.message}`, 'error');
     return [];
   }
 }
 
 async function salvarDado(colecao, dados) {
   try {
+    if (!usuarioAtual) throw new Error('Usuário não autenticado.');
+
     dados.usuarioId = usuarioAtual.uid;
-    dados.criadoEm = new Date().toISOString();
-    await db.collection(colecao).add(dados);
-    return true;
+    dados.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+    dados.criadoEmISO = new Date().toISOString();
+
+    const ref = await db.collection(colecao).add(dados);
+    atualizarStatusFirebase(true);
+    return ref.id;
   } catch (e) {
-    console.error(e);
-    return false;
+    console.error(`Erro ao salvar em ${colecao}:`, e);
+    atualizarStatusFirebase(false, e.message);
+    notificar(`❌ Erro ao salvar: ${e.message}`, 'error');
+    return null;
   }
+}
+
+async function excluirRegistro(colecao, id, descricao = 'registro') {
+  if (!usuarioAtual || !id) return;
+
+  const confirma = confirm(`Confirma excluir ${descricao}? Esta ação não pode ser desfeita.`);
+  if (!confirma) return;
+
+  try {
+    await db.collection(colecao).doc(id).delete();
+
+    // Remove custos gerados automaticamente por ração/medicação quando houver vínculo.
+    if (colecao === 'racoes' || colecao === 'medicacoes') {
+      const custosVinculados = await db.collection('custos')
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .where('origemColecao', '==', colecao)
+        .where('origemId', '==', id)
+        .get();
+
+      if (!custosVinculados.empty) {
+        const batch = db.batch();
+        custosVinculados.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+    }
+
+    notificar('✅ Registro excluído com sucesso!');
+    await atualizarResumoTopo();
+    mostrarPagina(paginaAtual);
+  } catch (e) {
+    console.error('Erro ao excluir:', e);
+    atualizarStatusFirebase(false, e.message);
+    notificar(`❌ Erro ao excluir: ${e.message}`, 'error');
+  }
+}
+
+async function apagarLancamentosHoje() {
+  if (!usuarioAtual) return;
+
+  const data = hojeISO();
+  const colecoes = ['aves', 'ovos', 'racoes', 'medicacoes', 'mortalidades', 'custos'];
+  const confirma = confirm(`Confirma apagar TODOS os lançamentos de hoje (${formatarData(data)})?\n\nSerão removidos registros de aves, ovos, ração, medicação, mortalidade e custos do usuário logado.`);
+  if (!confirma) return;
+
+  try {
+    let total = 0;
+    let batch = db.batch();
+    let operacoes = 0;
+
+    async function commitSeNecessario(forcar = false) {
+      if (operacoes > 0 && (forcar || operacoes >= 450)) {
+        await batch.commit();
+        batch = db.batch();
+        operacoes = 0;
+      }
+    }
+
+    for (const colecao of colecoes) {
+      const snapshot = await db.collection(colecao)
+        .where('usuarioId', '==', usuarioAtual.uid)
+        .where('data', '==', data)
+        .get();
+
+      snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+        operacoes++;
+        total++;
+      });
+
+      await commitSeNecessario();
+    }
+
+    await commitSeNecessario(true);
+
+    notificar(total > 0 ? `✅ ${total} lançamento(s) de hoje apagado(s).` : 'ℹ️ Nenhum lançamento de hoje encontrado.');
+    await atualizarResumoTopo();
+    mostrarPagina(paginaAtual);
+  } catch (e) {
+    console.error('Erro ao apagar lançamentos de hoje:', e);
+    atualizarStatusFirebase(false, e.message);
+    notificar(`❌ Erro ao apagar lançamentos de hoje: ${e.message}`, 'error');
+  }
+}
+
+async function atualizarResumoTopo() {
+  const aves = await getTotalAves();
+  const ovos = await getTotalOvos();
+  document.getElementById('infoAves').innerHTML = `🐔 ${aves} aves | ${ovos} ovos`;
 }
 
 // ============================================
@@ -567,37 +738,50 @@ async function salvarDado(colecao, dados) {
 // ============================================
 
 async function iniciarApp() {
-  let aves = await getTotalAves();
-  let ovos = await getTotalOvos();
-  document.getElementById('infoAves').innerHTML = `🐔 ${aves} aves | ${ovos} ovos`;
-  
-  // Buscar dados do usuário
+  await atualizarResumoTopo();
+
+  let dadosUsuario = null;
   try {
-    const doc = await db.collection('usuarios').doc(usuarioAtual.uid).get();
-    if (doc.exists) {
-      const userData = doc.data();
-      document.getElementById('userNome').textContent = userData.nome || 'Usuário';
+    const userDoc = await db.collection('usuarios').doc(usuarioAtual.uid).get();
+
+    if (userDoc.exists) {
+      dadosUsuario = userDoc.data();
+    } else {
+      // Garante que usuários reais do Firebase Auth tenham perfil no Firestore.
+      dadosUsuario = {
+        nome: usuarioAtual.email ? usuarioAtual.email.split('@')[0] : 'Usuário',
+        email: usuarioAtual.email || '',
+        funcao: 'colaborador',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        criadoEmISO: new Date().toISOString()
+      };
+      await db.collection('usuarios').doc(usuarioAtual.uid).set(dadosUsuario);
     }
+
+    const usuarioEl = document.getElementById('usuarioLogado');
+    if (usuarioEl) usuarioEl.textContent = dadosUsuario.nome || usuarioAtual.email || 'Usuário';
+    atualizarStatusFirebase(true);
   } catch (e) {
-    console.error(e);
+    console.error('Erro ao buscar usuário:', e);
+    atualizarStatusFirebase(false, e.message);
+    notificar(`❌ Erro ao acessar dados do Firebase: ${e.message}`, 'error');
   }
-  
+
   let menu = document.getElementById('menuSuperior');
   let paginas = ['dashboard', 'aves', 'ovos', 'racao', 'medicacao', 'mortalidade', 'custos', 'custo-unitario', 'relatorios'];
   let nomes = ['📊 Dashboard', '🐔 Aves', '🥚 Ovos', '🌾 Ração', '💊 Medicação', '⚠️ Mortalidade', '💰 Custos', '📈 Custo Unitário', '📄 Relatórios'];
-  
+
   // Verificar se o usuário tem permissão de admin
-  const userDoc = await db.collection('usuarios').doc(usuarioAtual.uid).get();
-  if (userDoc.exists && userDoc.data().funcao === 'diretor') {
+  if (dadosUsuario && dadosUsuario.funcao === 'diretor') {
     paginas.push('usuarios');
     nomes.push('👤 Usuários');
   }
-  
+
   menu.innerHTML = '';
   for (let i = 0; i < paginas.length; i++) {
-    menu.innerHTML += `<button onclick="mostrarPagina('${paginas[i]}')">${nomes[i]}</button>`;
+    menu.innerHTML += `<button onclick="mostrarPagina('${paginas[i]}', this)" data-pagina="${paginas[i]}">${nomes[i]}</button>`;
   }
-  
+
   mostrarPagina('dashboard');
 }
 
@@ -607,10 +791,13 @@ async function iniciarApp() {
 
 let paginaAtual = 'dashboard';
 
-function mostrarPagina(pagina) {
+function mostrarPagina(pagina, botao = null) {
   paginaAtual = pagina;
-  document.querySelectorAll('#menuSuperior button').forEach(btn => btn.classList.remove('ativo'));
-  if (event && event.target) event.target.classList.add('ativo');
+  document.querySelectorAll('#menuSuperior button').forEach(btn => {
+    btn.classList.remove('ativo');
+    if (!botao && btn.dataset.pagina === pagina) btn.classList.add('ativo');
+  });
+  if (botao) botao.classList.add('ativo');
   
   let titulos = {
     dashboard: '📊 Dashboard',
@@ -651,7 +838,7 @@ async function renderDashboard(container) {
   const ovos = await getTotalOvos();
   const custos = await getTotalCustos();
   
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   const mesInicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
   
   // Buscar ovos do mês
@@ -722,6 +909,9 @@ async function renderDashboard(container) {
       <p style="margin-top:12px; font-size:12px; color:#888;">
         💡 <strong>Dica:</strong> Comece cadastrando suas aves e depois registre as coletas de ovos.
       </p>
+      <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="apagarLancamentosHoje()">🧹 Apagar lançamentos de hoje</button>
+      </div>
     </div>
     
     <div class="card">
@@ -752,7 +942,7 @@ async function renderAves(container) {
       <div class="card">
         <h3>➕ Registrar Movimentação</h3>
         <div class="formulario">
-          <div class="campo"><label>📅 Data</label><input type="date" id="aveData" value="${new Date().toISOString().split('T')[0]}"></div>
+          <div class="campo"><label>📅 Data</label><input type="date" id="aveData" value="${hojeISO()}"></div>
           <div class="campo"><label>📌 Tipo</label><select id="aveTipo"><option value="entrada">Entrada (Novas Aves)</option><option value="saida">Saída (Venda/Descarte)</option></select></div>
           <div class="campo"><label>🔢 Quantidade</label><input type="number" id="aveQtd" min="1"></div>
           <div class="campo"><label>📝 Observação</label><textarea id="aveObs" rows="2"></textarea></div>
@@ -763,10 +953,10 @@ async function renderAves(container) {
         <h3>📋 Histórico (Total: ${aves} aves)</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Obs</th></tr></thead>
+            <thead><tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Obs</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhuma movimentação</td></tr>' :
-              lista.map(a => `<tr><td>${formatarData(a.data)}</td><td>${a.tipo === 'entrada' ? '➕ Entrada' : '➖ Saída'}</td><td>${a.quantidade}</td><td>${a.obs || '—'}</td></tr>`).join('')}
+              ${lista.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhuma movimentação</td></tr>' :
+              lista.map(a => `<tr><td>${formatarData(a.data)}</td><td>${a.tipo === 'entrada' ? '➕ Entrada' : '➖ Saída'}</td><td>${a.quantidade}</td><td>${escapeHtml(a.obs) || '—'}</td><td class="acoes">${botaoExcluir('aves', a.id, 'movimentação de aves')}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -789,6 +979,7 @@ async function salvarAve() {
   const ok = await salvarDado('aves', { data, tipo, quantidade: qtd, obs });
   if (ok) {
     notificar('✅ Movimentação registrada!');
+    await atualizarResumoTopo();
     document.getElementById('aveQtd').value = '';
     document.getElementById('aveObs').value = '';
     mostrarPagina('aves');
@@ -804,7 +995,7 @@ async function salvarAve() {
 async function renderOvos(container) {
   const lista = await carregarDados('ovos');
   const total = await getTotalOvos();
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   
   container.innerHTML = `
     <div class="grid2">
@@ -822,10 +1013,10 @@ async function renderOvos(container) {
         <h3>📋 Histórico de Coletas (Total: ${total} ovos)</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Inteiros</th><th>Trincados</th><th>Total</th></tr></thead>
+            <thead><tr><th>Data</th><th>Inteiros</th><th>Trincados</th><th>Total</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhuma coleta</td></tr>' :
-              lista.map(o => `<tr><td>${formatarData(o.data)}</td><td>${o.inteiros}</td><td>${o.trincados}</td><td><strong>${o.inteiros + o.trincados}</strong></td></tr>`).join('')}
+              ${lista.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhuma coleta</td></tr>' :
+              lista.map(o => `<tr><td>${formatarData(o.data)}</td><td>${o.inteiros}</td><td>${o.trincados}</td><td><strong>${(o.inteiros || 0) + (o.trincados || 0)}</strong></td><td class="acoes">${botaoExcluir('ovos', o.id, 'coleta de ovos')}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -848,6 +1039,7 @@ async function salvarOvo() {
   const ok = await salvarDado('ovos', { data, inteiros, trincados, obs });
   if (ok) {
     notificar('✅ Coleta registrada com sucesso!');
+    await atualizarResumoTopo();
     document.getElementById('ovoInteiros').value = '0';
     document.getElementById('ovoTrincados').value = '0';
     document.getElementById('ovoObs').value = '';
@@ -864,7 +1056,7 @@ async function salvarOvo() {
 async function renderRacao(container) {
   const lista = await carregarDados('racoes');
   const aves = await getTotalAves();
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   
   container.innerHTML = `
     <div class="grid2">
@@ -888,13 +1080,13 @@ async function renderRacao(container) {
         <h3>📋 Histórico de Consumo</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Ração</th><th>Custo</th><th>Custo/Ave</th></tr></thead>
+            <thead><tr><th>Data</th><th>Ração</th><th>Custo</th><th>Custo/Ave</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhum consumo</td></tr>' :
+              ${lista.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhum consumo</td></tr>' :
               lista.map(r => {
                 const custoTotal = (r.raCusto||0) + (r.aguaCusto||0);
                 const custoPorAve = aves > 0 ? custoTotal/aves : 0;
-                return `<tr><td>${formatarData(r.data)}</td><td>${(r.raKg||0).toFixed(1)} kg</td><td>${formatarMoeda(custoTotal)}</td><td>${formatarMoeda(custoPorAve)}</td></tr>`;
+                return `<tr><td>${formatarData(r.data)}</td><td>${(r.raKg||0).toFixed(1)} kg</td><td>${formatarMoeda(custoTotal)}</td><td>${formatarMoeda(custoPorAve)}</td><td class="acoes">${botaoExcluir('racoes', r.id, 'consumo de ração/água')}</td></tr>`;
               }).join('')}
             </tbody>
           </table>
@@ -911,43 +1103,46 @@ async function salvarRacao() {
   const raCusto = parseFloat(document.getElementById('raCusto').value) || 0;
   const aguaL = parseFloat(document.getElementById('aguaL').value) || 0;
   const aguaCusto = parseFloat(document.getElementById('aguaCusto').value) || 0;
-  
+
   if (raKg === 0 && aguaL === 0) {
     notificar('⚠️ Informe pelo menos um consumo');
     return;
   }
-  
-  const ok = await salvarDado('racoes', { data, tipo: raTipo, raKg, raCusto, aguaL, aguaCusto });
-  if (!ok) {
+
+  const racaoId = await salvarDado('racoes', { data, tipo: raTipo, raKg, raCusto, aguaL, aguaCusto });
+  if (!racaoId) {
     notificar('❌ Erro ao registrar', 'error');
     return;
   }
-  
-  // Registrar custos separadamente
+
+  // Registrar custos separadamente com vínculo para exclusão futura.
   if (raCusto > 0) {
-    await db.collection('custos').add({
+    await salvarDado('custos', {
       data,
+      categoria: 'ração',
       descricao: `Ração ${raTipo} (${raKg}kg)`,
       valor: raCusto,
-      usuarioId: usuarioAtual.uid,
-      criadoEm: new Date().toISOString()
+      origemColecao: 'racoes',
+      origemId: racaoId
     });
   }
   if (aguaCusto > 0) {
-    await db.collection('custos').add({
+    await salvarDado('custos', {
       data,
+      categoria: 'água',
       descricao: `Água (${aguaL}L)`,
       valor: aguaCusto,
-      usuarioId: usuarioAtual.uid,
-      criadoEm: new Date().toISOString()
+      origemColecao: 'racoes',
+      origemId: racaoId
     });
   }
-  
+
   notificar('✅ Consumo registrado com sucesso!');
   document.getElementById('raKg').value = '0';
   document.getElementById('raCusto').value = '0';
   document.getElementById('aguaL').value = '0';
   document.getElementById('aguaCusto').value = '0';
+  await atualizarResumoTopo();
   mostrarPagina('racao');
 }
 
@@ -957,7 +1152,7 @@ async function salvarRacao() {
 
 async function renderMedicacao(container) {
   const lista = await carregarDados('medicacoes');
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   
   container.innerHTML = `
     <div class="grid2">
@@ -977,10 +1172,10 @@ async function renderMedicacao(container) {
         <h3>📋 Histórico de Medicações</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Produto</th><th>Finalidade</th><th>Custo</th></tr></thead>
+            <thead><tr><th>Data</th><th>Produto</th><th>Finalidade</th><th>Custo</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhuma medicação</td></tr>' :
-              lista.map(m => `<tr><td>${formatarData(m.data)}</td><td><strong>${m.produto}</strong></td><td>${m.finalidade}</td><td>${formatarMoeda(m.custo)}</td></tr>`).join('')}
+              ${lista.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhuma medicação</td></tr>' :
+              lista.map(m => `<tr><td>${formatarData(m.data)}</td><td><strong>${escapeHtml(m.produto)}</strong></td><td>${escapeHtml(m.finalidade)}</td><td>${formatarMoeda(m.custo)}</td><td class="acoes">${botaoExcluir('medicacoes', m.id, 'medicação')}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -996,32 +1191,34 @@ async function salvarMedicacao() {
   const custo = parseFloat(document.getElementById('medCusto').value) || 0;
   const aves = parseInt(document.getElementById('medAves').value) || await getTotalAves();
   const obs = document.getElementById('medObs').value;
-  
+
   if (!produto) {
     notificar('⚠️ Informe o produto');
     return;
   }
-  
-  const ok = await salvarDado('medicacoes', { data, produto, finalidade, custo, aves, obs });
-  if (!ok) {
+
+  const medicacaoId = await salvarDado('medicacoes', { data, produto, finalidade, custo, aves, obs });
+  if (!medicacaoId) {
     notificar('❌ Erro ao registrar', 'error');
     return;
   }
-  
+
   if (custo > 0) {
-    await db.collection('custos').add({
+    await salvarDado('custos', {
       data,
+      categoria: 'medicamento',
       descricao: `Medicação: ${produto}`,
       valor: custo,
-      usuarioId: usuarioAtual.uid,
-      criadoEm: new Date().toISOString()
+      origemColecao: 'medicacoes',
+      origemId: medicacaoId
     });
   }
-  
+
   notificar('✅ Medicação registrada com sucesso!');
   document.getElementById('medProduto').value = '';
   document.getElementById('medCusto').value = '';
   document.getElementById('medObs').value = '';
+  await atualizarResumoTopo();
   mostrarPagina('medicacao');
 }
 
@@ -1032,7 +1229,7 @@ async function salvarMedicacao() {
 async function renderMortalidade(container) {
   const lista = await carregarDados('mortalidades');
   const aves = await getTotalAves();
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   
   let totalMortes = 0;
   lista.forEach(m => totalMortes += (m.qtd || 0));
@@ -1058,10 +1255,10 @@ async function renderMortalidade(container) {
         <h3>📋 Histórico de Mortalidade</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Qtd</th><th>Causa</th></tr></thead>
+            <thead><tr><th>Data</th><th>Qtd</th><th>Causa</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="3" style="text-align:center; color:#888;">Nenhuma mortalidade</td></tr>' :
-              lista.map(m => `<tr><td>${formatarData(m.data)}</td><td><strong>${m.qtd}</strong></td><td>${m.causa || '—'}</td></tr>`).join('')}
+              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhuma mortalidade</td></tr>' :
+              lista.map(m => `<tr><td>${formatarData(m.data)}</td><td><strong>${m.qtd}</strong></td><td>${escapeHtml(m.causa) || '—'}</td><td class="acoes">${botaoExcluir('mortalidades', m.id, 'mortalidade')}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -1084,6 +1281,7 @@ async function salvarMortalidade() {
   const ok = await salvarDado('mortalidades', { data, qtd, causa, obs });
   if (ok) {
     notificar('✅ Mortalidade registrada');
+    await atualizarResumoTopo();
     document.getElementById('mortQtd').value = '';
     document.getElementById('mortObs').value = '';
     mostrarPagina('mortalidade');
@@ -1099,7 +1297,7 @@ async function salvarMortalidade() {
 async function renderCustos(container) {
   const lista = await carregarDados('custos');
   const total = await getTotalCustos();
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeISO();
   
   container.innerHTML = `
     <div class="grid2">
@@ -1118,10 +1316,10 @@ async function renderCustos(container) {
         <h3>📋 Últimos Custos (Total: ${formatarMoeda(total)})</h3>
         <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+            <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Ações</th></tr></thead>
             <tbody>
-              ${lista.length === 0 ? '<tr><td colspan="3" style="text-align:center; color:#888;">Nenhum custo</td></tr>' :
-              lista.slice(0,20).map(c => `<tr><td>${formatarData(c.data)}</td><td><strong>${c.descricao}</strong></td><td style="font-weight:bold;">${formatarMoeda(c.valor)}</td></tr>`).join('')}
+              ${lista.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">Nenhum custo</td></tr>' :
+              lista.slice(0,20).map(c => `<tr><td>${formatarData(c.data)}</td><td><strong>${escapeHtml(c.descricao)}</strong></td><td style="font-weight:bold;">${formatarMoeda(c.valor)}</td><td class="acoes">${botaoExcluir('custos', c.id, 'custo/despesa')}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -1145,6 +1343,7 @@ async function salvarCusto() {
   const ok = await salvarDado('custos', { data, categoria: cat, descricao: desc, valor, fornecedor });
   if (ok) {
     notificar('✅ Custo registrado com sucesso!');
+    await atualizarResumoTopo();
     document.getElementById('custoDesc').value = '';
     document.getElementById('custoValor').value = '';
     document.getElementById('custoFornecedor').value = '';
@@ -1245,7 +1444,7 @@ async function renderUsuarios(container) {
             <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th></tr></thead>
             <tbody>
               ${usuarios.length === 0 ? '<tr><td colspan="3" style="text-align:center; color:#888;">Nenhum usuário</td></tr>' :
-              usuarios.map(u => `<tr><td><strong>${u.nome || '—'}</strong></td><td>${u.email}</td><td>${u.funcao === 'diretor' ? '👑 Diretor' : '👤 Colaborador'}</td></tr>`).join('')}
+              usuarios.map(u => `<tr><td><strong>${escapeHtml(u.nome) || '—'}</strong></td><td>${escapeHtml(u.email)}</td><td>${u.funcao === 'diretor' ? '👑 Diretor' : '👤 Colaborador'}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -1309,7 +1508,7 @@ auth.onAuthStateChanged(user => {
 });
 
 console.log('📊 OVONORTE - Sistema de Gestão Avícola (Firebase)');
-console.log('🔑 Login: admin@ovonorte.com.br / admin123');
+console.log('🔐 Autenticação via Firebase Auth.');
 </script>
 </body>
 </html>
